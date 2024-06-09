@@ -1,5 +1,5 @@
 def main():
-    print("Search for media on Uakino:")
+    print("No Actions. Stream2MediaServer")
 
 if __name__ == "__main__":
     main()

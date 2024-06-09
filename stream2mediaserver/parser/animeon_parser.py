@@ -87,6 +87,7 @@ def setup_database(connection):
     # Create the 'fundub_synonym' table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS fundub_synonym (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             fundub_id INTEGER,
             synonym TEXT,
             FOREIGN KEY(fundub_id) REFERENCES fundub(id)
@@ -96,6 +97,7 @@ def setup_database(connection):
     # Create the 'anime_fundub' table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS anime_fundub (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             anime_id INTEGER,
             fundub_id INTEGER,
             FOREIGN KEY(anime_id) REFERENCES anime(id),
