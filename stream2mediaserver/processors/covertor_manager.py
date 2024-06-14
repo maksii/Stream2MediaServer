@@ -8,4 +8,9 @@ class ConvertorManager:
 
     def concatenate_to_mkv(self, input_txt_path, output_file_path):
         ffmpeg_command = ['ffmpeg', '-y', '-safe', '0', '-f', 'concat', '-i', input_txt_path, '-c', 'copy', output_file_path]
-        subprocess.run(ffmpeg_command, check=True)
+        try:
+            subprocess.run(ffmpeg_command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except subprocess.CalledProcessError as e:
+            print(f"Error during video concatenation: {e.stderr.decode()}")
+            return False
+        return True

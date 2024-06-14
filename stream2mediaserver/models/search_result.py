@@ -1,6 +1,7 @@
 class SearchResult:
-    def __init__(self, title, link, description, image_url=None, series_info=None, year=None, rating=None, additional_info=None):
+    def __init__(self, title, link, title_eng=None,  description=None, image_url=None, series_info=None, year=None, rating=None, additional_info=None):
         self.title = title
+        self.title_eng = title_eng
         self.link = link
         self.description = description
         self.image_url = image_url

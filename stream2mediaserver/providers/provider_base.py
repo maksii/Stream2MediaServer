@@ -6,36 +6,28 @@ class ProviderBase(ABC):
 
     @property
     def base_url(self):
-        """Get the tags."""
+        """Get the url."""
         return self._base_url
 
     @base_url.setter
     def base_url(self, value):
-        """Set the tags."""
+        """Set the url."""
         self._base_url = value
         
     @property
     def dle_login_hash(self):
-        """Get the tags."""
+        """Get the dle."""
         return self._dle_login_hash
 
     @dle_login_hash.setter
     def dle_login_hash(self, value):
-        """Set the tags."""
+        """Set the dle."""
         self._dle_login_hash = value
-
-    @abstractmethod
-    def load_home_page(self, query):
-        pass
 
     @abstractmethod
     def search_title(self, query):
         pass
-    
-    @abstractmethod
-    def search_full_title(self, query):
-        pass
-    
+
     @abstractmethod
     def load_details_page(self, query):
         pass
