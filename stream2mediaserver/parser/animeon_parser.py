@@ -12,6 +12,18 @@ def create_connection(db_file):
         print(e)
     return conn
 
+#bad data quality, map duplicates to master records
+FUNDUB_ID_MAPPING = {
+    1483: 1482, 1488: 1482, 1348: 1229, 1366: 1195, 1373: 1134, 1384: 1175, 1359: 1105,
+    1425: 1220, 1432: 1431, 1190: 1398, 1455: 1406, 1349: 1141, 1147: 1142, 1379: 1335,
+    1356: 1115, 1347: 1170, 1367: 1414, 1409: 1137, 1444: 1388, 1167: 1388, 1376: 1140,
+    1466: 1185, 1382: 1185, 1362: 1163, 1396: 1116, 1371: 1184, 1178: 1100, 1368: 1434,
+    1126: 1143, 1166: 1446, 1172: 1179
+}
+
+def get_master_fundub_id(fundub_id):
+    return FUNDUB_ID_MAPPING.get(fundub_id, fundub_id)
+
 def setup_database(connection):
     cursor = connection.cursor()
 
@@ -248,9 +260,12 @@ def insert_fundub_and_episodes(anime_id, fundub_data, episode, video_url, conn):
     player_id = fundub_data['player'][0]['id']
     fundub = fundub_data['fundub']
 
+    # Get master fundub_id
+    master_fundub_id = get_master_fundub_id(fundub['id'])
+
     # Insert or update fundub
     fundub_columns = {
-        'id': fundub['id'],
+        'id': master_fundub_id,
         'name': fundub['name'],
         'telegram': fundub.get('telegram', None)
     }
@@ -259,7 +274,11 @@ def insert_fundub_and_episodes(anime_id, fundub_data, episode, video_url, conn):
     #Insert fundub synonyms if they exist
     if fundub.get('synonyms'):
         for synonym in fundub['synonyms']:
-            insert_unique_synonym(cursor, fundub['id'], synonym)
+            insert_unique_synonym(cursor, master_fundub_id, synonym)
+
+    # If the original fundub ID does not match the master fundub ID, add the original name as a synonym
+    if fundub['id'] != master_fundub_id:
+        insert_unique_synonym(cursor, master_fundub_id, fundub['name'])
 
     # Insert or update episode
     episode_data = {
@@ -273,7 +292,7 @@ def insert_fundub_and_episodes(anime_id, fundub_data, episode, video_url, conn):
     insert_or_update(cursor, 'episode', 'id', episode_data, ['episode', 'subtitles', 'videoUrl', 'player', 'anime_id'])
 
     # Link fundub with episode
-    cursor.execute("INSERT OR IGNORE INTO fundub_episode (fundub_id, episode_id) VALUES (?, ?)", (fundub['id'], episode['id']))
+    cursor.execute("INSERT OR IGNORE INTO fundub_episode (fundub_id, episode_id) VALUES (?, ?)", (master_fundub_id, episode['id']))
 
     # Commit changes
     cursor.connection.commit()
@@ -341,7 +360,7 @@ def populate_new_anime_ids(anime_list, conn):
     for anime in anime_list:
         cursor.execute("SELECT id FROM anime WHERE id = ?", (anime['id'],))
         if not cursor.fetchone():
-            cursor.execute("INSERT INTO new_anime_ids (id) VALUES (?)", (anime['id'],))
+            cursor.execute("INSERT OR IGNORE INTO new_anime_ids (id) VALUES (?)", (anime['id'],))
     conn.commit()
 
 def process_new_anime_ids(conn):
