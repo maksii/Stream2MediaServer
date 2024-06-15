@@ -224,3 +224,40 @@ WHERE fundub_id IN (1483, 1488, 1348, 1366, 1373, 1384, 1359, 1425, 1432, 1190, 
 
 DELETE FROM fundub
 WHERE id IN (1483, 1488, 1348, 1366, 1373, 1384, 1359, 1425, 1432, 1190, 1455, 1349, 1147, 1379, 1356, 1347, 1367, 1409, 1444, 1167, 1376, 1466, 1382, 1362, 1396, 1371, 1178, 1368, 1126, 1166, 1172);
+
+UPDATE fundub
+SET telegram = CASE id
+    WHEN 1464 THEN 'https://t.me/channel3737'
+    WHEN 1173 THEN 'https://t.me/TO_48Volts'
+    WHEN 1446 THEN 'https://t.me/foryouanime_4ua'
+    WHEN 1393 THEN 'https://t.me/AIDsubStudio'
+    WHEN 1481 THEN 'https://t.me/AniCoin_official'
+    WHEN 1473 THEN 'https://t.me/AniFanUa'
+    WHEN 1358 THEN 'https://t.me/Anikoe_studio'
+    WHEN 1405 THEN 'https://t.me/anitube_in_ua'
+    WHEN 1351 THEN 'https://t.me/AniUnion'
+    WHEN 1233 THEN 'https://t.me/arteamko'
+    WHEN 1354 THEN 'https://t.me/Bambooua2022'
+    WHEN 1 THEN 'https://t.me/bitari_territory'
+    WHEN 1117 THEN 'https://t.me/CrystalVoicesUA'
+    WHEN 1395 THEN 'https://t.me/dlggsub'
+    WHEN 1184 THEN 'https://t.me/EspadaDub'
+    WHEN 1412 THEN 'https://t.me/fairydub'
+    WHEN 1389 THEN 'https://t.me/flamestudioua'
+    WHEN 1459 THEN 'https://t.me/fomalhaut_dub'
+    WHEN 1355 THEN 'https://t.me/subfukuronachi'
+    WHEN 1458 THEN 'https://t.me/liben_s'
+    WHEN 1403 THEN 'https://t.me/kagawaua'
+    WHEN 1415 THEN 'https://t.me/Legat_translate'
+    WHEN 1177 THEN 'https://t.me/Legat_translate'
+    WHEN 1410 THEN 'https://t.me/otakoi_studio'
+    WHEN 1385 THEN 'https://t.me/uamax_dub'
+    WHEN 1141 THEN 'https://t.me/animriya_team'
+    WHEN 1483 THEN 'https://t.me/inariokami58'
+    WHEN 1105 THEN 'https://t.me/robotaholosom'
+    WHEN 1134 THEN 'https://t.me/realCossackdubbing'
+    WHEN 1129 THEN 'https://t.me/+U75ZKIbxj68QKIM8'
+    WHEN 1171 THEN 'https://t.me/kutochok_anime'
+    WHEN 1249 THEN 'https://t.me/HatinaDubera'
+END
+WHERE id IN (1464, 1173, 1446, 1393, 1481, 1473, 1358, 1405, 1351, 1233, 1354, 1, 1117, 1395, 1184, 1412, 1389, 1459, 1355, 1458, 1403, 1415, 1177, 1410, 1385, 1141, 1483, 1105, 1134, 1129, 1171, 1249);
