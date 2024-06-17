@@ -1,6 +1,6 @@
 import re
 from bs4 import BeautifulSoup
-from urllib.parse import quote
+from urllib.parse import quote, urlparse, urlunparse
 
 from stream2mediaserver.models.search_result import SearchResult
 from stream2mediaserver.models.series import Series
@@ -57,7 +57,11 @@ class SearchManager:
                 for link in soup.find_all('a', class_='search-result-link'):
                     url = unquote(link.get('href', ''))
                     poster = unquote(link.img.get('src', '')) if link.img else ''
-
+                    if poster:
+                        parsed_url = urlparse(poster)
+                        if not parsed_url.netloc:
+                            new_url = urlunparse(parsed_url._replace(scheme='https', netloc='uakino.club'))
+                            poster = new_url
                     # Extracting and cleaning the name
                     name = link.find('span', class_='searchheading')
                     name = SearchManager.clean_text(name.get_text()) if name else ''
@@ -124,7 +128,13 @@ class SearchManager:
                 data = response.json()
                 for item in data['result']:
                     url = f"https://animeon.club/api/anime/{item['id']}"
-                    poster = f"https://animeon.club/api/uploads/images/{item['image']['original']}"
+                    poster = ""
+                    if item.get('poster'):
+                        poster = item['poster']
+                    elif item.get('image') and item['image'].get('original'):
+                        poster = f"https://animeon.club/api/uploads/images/{item['image']['original']}"
+                    elif item.get('image') and item['image'].get('preview'):
+                        poster = f"https://animeon.club/api/uploads/images/{item['image']['preview']}"
 
                     # Extracting title in Ukrainian
                     name = item['titleUa']
