@@ -130,7 +130,7 @@ class SearchManager:
                     url = f"https://animeon.club/api/anime/{item['id']}"
                     poster = ""
                     if item.get('poster'):
-                        poster = item['poster']
+                        poster = f"https://animeon.club/api/uploads/images/{item['poster']}"
                     elif item.get('image') and item['image'].get('original'):
                         poster = f"https://animeon.club/api/uploads/images/{item['image']['original']}"
                     elif item.get('image') and item['image'].get('preview'):
