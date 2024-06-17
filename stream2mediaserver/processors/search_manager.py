@@ -13,11 +13,6 @@ class SearchManager:
 
     @staticmethod
     def get_dle_login_hash(provider, url):
-        selector = ""
-        if provider == 'uakino':
-            selector = 'var dle_login_hash'
-        if provider == 'anitube':
-            selector = 'var dle_login_hash'
         response = RequestManager().get(url)
         if response.ok:
             soup = BeautifulSoup(response.text, 'html.parser')
@@ -40,9 +35,10 @@ class SearchManager:
     def search_movies(provider, query, base_url, search_url):
         #TBD refactor to common calls, for now just ifs
         dle_hash = SearchManager.get_dle_login_hash(provider, base_url)
-        if not dle_hash:
-            print("Failed to retrieve dle_login_hash")
-            return []
+        
+        if provider != "animeon":
+            if not dle_hash:
+                print("Failed to retrieve dle_login_hash")
 
         encoded_query = quote(query)
         
@@ -120,9 +116,9 @@ class SearchManager:
             return results
         
         #animeon custom json
-        if provider == "uaflix":
+        if provider == "animeon":
 
-            response = RequestManager.get(search_url)
+            response = RequestManager.get(f'{search_url}/{encoded_query}?full=false')
             results = []
             if response.ok:
                 data = response.json()
