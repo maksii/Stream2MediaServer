@@ -2,9 +2,9 @@ import re
 from bs4 import BeautifulSoup
 from urllib.parse import quote
 
-from models.search_result import SearchResult
-from models.series import Series
-from processors.request_manager import RequestManager
+from stream2mediaserver.models.search_result import SearchResult
+from stream2mediaserver.models.series import Series
+from stream2mediaserver.processors.request_manager import RequestManager
 
 import html
 from urllib.parse import unquote

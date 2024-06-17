@@ -1,9 +1,9 @@
 
 import time
-from processors.covertor_manager import ConvertorManager
-from processors.m3u8_manager import M3U8Manager
-from processors.search_manager import SearchManager
-from providers.provider_base import ProviderBase
+from stream2mediaserver.processors.covertor_manager import ConvertorManager
+from stream2mediaserver.processors.m3u8_manager import M3U8Manager
+from stream2mediaserver.processors.search_manager import SearchManager
+from stream2mediaserver.providers.provider_base import ProviderBase
 
 class AnimeOnProvider(ProviderBase):
     def __init__(self, config):

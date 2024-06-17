@@ -3,7 +3,7 @@ import re
 import m3u8
 import requests
 
-from processors.request_manager import RequestManager
+from stream2mediaserver.processors.request_manager import RequestManager
 
 class M3U8Manager:
     @staticmethod
