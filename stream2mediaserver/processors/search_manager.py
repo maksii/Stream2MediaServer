@@ -12,7 +12,12 @@ from urllib.parse import unquote
 class SearchManager:
 
     @staticmethod
-    def get_dle_login_hash(url):
+    def get_dle_login_hash(provider, url):
+        selector = ""
+        if provider == 'uakino':
+            selector = 'var dle_login_hash'
+        if provider == 'anitube':
+            selector = 'var dle_login_hash'
         response = RequestManager().get(url)
         if response.ok:
             soup = BeautifulSoup(response.text, 'html.parser')
@@ -32,36 +37,107 @@ class SearchManager:
         return text.strip()
 
     @staticmethod
-    def search_movies(query, base_url, search_url):
-        dle_hash = SearchManager.get_dle_login_hash(base_url)
+    def search_movies(provider, query, base_url, search_url):
+        #TBD refactor to common calls, for now just ifs
+        dle_hash = SearchManager.get_dle_login_hash(provider, base_url)
         if not dle_hash:
             print("Failed to retrieve dle_login_hash")
             return []
 
         encoded_query = quote(query)
-        form_data = {
-            'story': encoded_query,
-            'dle_hash': dle_hash,
-            'thisUrl': '/'
-        }
+        
+        #uakino dle
+        if provider == "uakino":
+            form_data = {
+                'story': encoded_query,
+                'dle_hash': dle_hash,
+                'thisUrl': '/'
+            }
 
-        response = RequestManager.post(search_url, data=form_data)
-        results = []
-        if response.ok:
-            soup = BeautifulSoup(response.json()['content'], 'html.parser')
-            for link in soup.find_all('a', class_='search-result-link'):
-                url = unquote(link.get('href', ''))
-                poster = unquote(link.img.get('src', '')) if link.img else ''
-                
-                # Extracting and cleaning the name
-                name = link.find('span', class_='searchheading')
-                name = SearchManager.clean_text(name.get_text()) if name else ''
+            response = RequestManager.post(search_url, data=form_data)
+            results = []
+            if response.ok:
+                soup = BeautifulSoup(response.json()['content'], 'html.parser')
+                for link in soup.find_all('a', class_='search-result-link'):
+                    url = unquote(link.get('href', ''))
+                    poster = unquote(link.img.get('src', '')) if link.img else ''
 
-                # Extracting and cleaning the English name
-                name_eng = link.find('span', class_='search-orig-title')
-                name_eng = SearchManager.clean_text(name_eng.get_text()) if name_eng else ''
-                results.append(SearchResult(link=url, image_url=poster, title=name, title_eng=name_eng))
-        return results
+                    # Extracting and cleaning the name
+                    name = link.find('span', class_='searchheading')
+                    name = SearchManager.clean_text(name.get_text()) if name else ''
+
+                    # Extracting and cleaning the English name
+                    name_eng = link.find('span', class_='search-orig-title')
+                    name_eng = SearchManager.clean_text(name_eng.get_text()) if name_eng else ''
+                    results.append(SearchResult(link=url, image_url=poster, title=name, title_eng=name_eng, provider=provider))
+            return results
+        
+        #anitube dle
+        if provider == "anitube":
+            form_data = {
+                'query': query,
+                'user_hash': dle_hash
+            }
+
+            response = RequestManager.post(search_url, data=form_data)
+            results = []
+            if response.ok:
+                soup = BeautifulSoup(response.text, 'html.parser')
+                for link in soup.find_all('a', style="display: block;"):
+                    url = unquote(link.get('href', ''))
+                    poster = unquote(link.img.get('src', '')) if link.img else ''
+
+                    # Extracting and cleaning the name
+                    name = link.find('b', class_='searchheading_title')
+                    name = SearchManager.clean_text(name.get_text()) if name else ''
+
+                    # Set English name to 'Not Specified' as there is no corresponding element
+                    name_eng = 'Not Specified'
+
+                    results.append(SearchResult(link=url, image_url=poster, title=name, title_eng=name_eng, provider=provider))
+            return results
+
+        #uaflix dle
+        if provider == "uaflix":
+
+            response = RequestManager.get(f'{search_url}{encoded_query}')
+            results = []
+            if response.ok:
+                soup = BeautifulSoup(response.text, 'html.parser')
+                for link in soup.find_all('a', class_='sres-wrap clearfix'):
+                    url = unquote(link.get('href', ''))
+                    poster = unquote(link.find('img').get('src', ''))
+                    if not poster.startswith('http'):
+                        poster = 'https://uaflix.net' + poster
+
+                    # Extracting and cleaning the name
+                    name = link.find('h2').get_text().split('/')[0].strip()
+
+                    # Extracting and cleaning the English name
+                    name_eng = link.find('h2').get_text().split('/')[1].strip() if '/' in link.find('h2').get_text() else 'Not Specified'
+
+                    results.append(SearchResult(link=url, image_url=poster, title=name, title_eng=name_eng, provider=provider))
+            return results
+        
+        #animeon custom json
+        if provider == "uaflix":
+
+            response = RequestManager.get(search_url)
+            results = []
+            if response.ok:
+                data = response.json()
+                for item in data['result']:
+                    url = f"https://animeon.club/api/anime/{item['id']}"
+                    poster = f"https://animeon.club/api/uploads/images/{item['image']['original']}"
+
+                    # Extracting title in Ukrainian
+                    name = item['titleUa']
+
+                    # Extracting title in English
+                    name_eng = item['titleEn']
+
+                    results.append(SearchResult(link=url, image_url=poster, title=name, title_eng=name_eng, provider=provider))
+            return results
 
     @staticmethod
     def get_series_page(series_url):

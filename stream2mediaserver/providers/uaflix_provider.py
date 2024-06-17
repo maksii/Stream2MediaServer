@@ -5,17 +5,19 @@ from processors.m3u8_manager import M3U8Manager
 from processors.search_manager import SearchManager
 from providers.provider_base import ProviderBase
 
-class GenericProvider(ProviderBase):
+class UaflixProvider(ProviderBase):
     def __init__(self, config):
         super().__init__(config)
-        self.base_url = "https://uakino.club"
-        self.search_url = f"{self.base_url}/engine/lazydev/dle_search/ajax.php"
+        self.provider = "uaflix"
+        self.provider_type = "dle"
+        self.base_url = "https://uaflix.net/"
+        self.search_url = f"{self.base_url}/index.php?do=search&subaction=search&story="
         self.playlist_url_template = f"{self.base_url}/engine/ajax/playlists.php"
 
 
     def search_title(self, query):
         # Conduct a search and return search results
-        return SearchManager.search_movies(query, self.base_url, self.search_url)
+        return SearchManager.search_movies(self.provider, query, self.base_url, self.search_url)
 
     def load_details_page(self, query):
         # Extract ID from URL and fetch series details
