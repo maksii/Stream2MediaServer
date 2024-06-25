@@ -2,6 +2,7 @@ import os
 import urllib.request
 
 class FileManager:
+    @staticmethod
     def download_file(self, url, destination_folder, file_name):
         if not os.path.exists(destination_folder):
             os.makedirs(destination_folder, exist_ok=True)  # Use exist_ok to avoid race conditions
@@ -14,7 +15,8 @@ class FileManager:
             print(f"Failed to download the file from {url}. Error: {e}")
             return None
         return file_path
-
+    
+    @staticmethod
     def concatenate_files(self, segment_files, output_file):
         try:
             with open(output_file, 'wb') as outfile:

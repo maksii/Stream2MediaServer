@@ -1,18 +1,18 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="stream2MediaServer",
-    version="0.0.4",
+    name="stream2mediaserver",
+    version="0.1.0",
     description="Addon to facilitate locating and adding TV series/anime streams with standardized naming for Sonarr/Plex/Jellyfin integration.",
-    url="https://github.com/maksii/stream2MediaServer",
+    url="https://github.com/maksii/stream2mediaserver",
     packages=find_packages(),
     include_package_data=True,
     package_data={
-        'stream2MediaServer': ['data/*'],
+        'stream2mediaserver': ['data/*'],
     },
     entry_points={
         'console_scripts': [
-            'stream2MediaServer=stream2MediaServer.main:main',
+            'stream2mediaserver=stream2mediaserver.main:main',
         ],
     },
     install_requires=[

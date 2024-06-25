@@ -146,19 +146,44 @@ class SearchManager:
             return results
 
     @staticmethod
-    def get_series_page(series_url):
+    def get_series_page(provider, series_url):
         response = RequestManager.get(series_url)
-        if response.ok:
-            series_list = []
-            soup = BeautifulSoup(response.json()['response'], 'html.parser')
-            for ul in soup.find_all('ul'):
-                for li in ul.find_all('li', attrs={"data-id": True, "data-file": True}):
-                    studio_id = li['data-id']
-                    studio_name = li['data-voice']
-                    series = li.text.strip()
-                    video_url = f'https:{li["data-file"]}'
+        series_list = []
+        if provider == "uakino":
+            if response.ok:
+                
+                soup = BeautifulSoup(response.json()['response'], 'html.parser')
+                for ul in soup.find_all('ul'):
+                    for li in ul.find_all('li', attrs={"data-id": True, "data-file": True}):
+                        studio_id = li['data-id']
+                        studio_name = li['data-voice']
+                        series = li.text.strip()
+                        video_url = f'https:{li["data-file"]}'
+                        series_list.append(Series(studio_id, studio_name, series, video_url))
+                return series_list
+        if provider == "anitube":
+                soup = BeautifulSoup(response.json()['response'], 'html.parser')
+                # Find all <li> elements that contain series information
+                series_items = soup.find_all('li', attrs={'data-file': True})
+
+                # Iterate through each series item to extract necessary details
+                for item in series_items:
+                    # Extract the studio ID from the data-id attribute
+                    studio_id = item['data-id']
+
+                    # Find the studio name by navigating up to the parent <ul> and then to the previous <ul>
+                    # Then finding the corresponding <li> with the same base data-id (up to the second last underscore)
+                    base_id = '_'.join(studio_id.split('_')[:-1])
+                    studio_name_li = soup.find('li', attrs={'data-id': base_id})
+                    studio_name = studio_name_li.text if studio_name_li else "Unknown"
+
+                    # Extract series number from the text of the <li> element
+                    series = item.text.strip()
+
+                    # Extract the video URL from the data-file attribute
+                    video_url = item['data-file']
                     series_list.append(Series(studio_id, studio_name, series, video_url))
-            return series_list
+                return series_list
         return []
 
     @staticmethod

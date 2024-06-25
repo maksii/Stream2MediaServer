@@ -25,7 +25,7 @@ class UakinoProvider(ProviderBase):
         news_id = SearchManager.extract_id_from_url(query)
         timestamp = int(time.time())
         series_url = f"{self.base_url}/engine/ajax/playlists.php?news_id={news_id}&xfield=playlist&time={timestamp}"
-        return SearchManager.get_series_page(series_url)
+        return SearchManager.get_series_page(self.provider, series_url)
 
     def load_player_page(self, query):
         # Load the master playlist for a series

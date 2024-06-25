@@ -10,7 +10,7 @@ class AnitubeProvider(ProviderBase):
         super().__init__(config)
         self.provider = "anitube"
         self.provider_type = "dle"
-        self.base_url = "https://anitube.in.ua/"
+        self.base_url = "https://anitube.in.ua"
         self.search_url = f"{self.base_url}/engine/ajax/controller.php?mod=search"
         self.playlist_url_template = f"{self.base_url}/engine/ajax/playlists.php"
 
@@ -22,9 +22,9 @@ class AnitubeProvider(ProviderBase):
     def load_details_page(self, query):
         # Extract ID from URL and fetch series details
         news_id = SearchManager.extract_id_from_url(query)
-        timestamp = int(time.time())
-        series_url = f"{self.base_url}/engine/ajax/playlists.php?news_id={news_id}&xfield=playlist&time={timestamp}"
-        return SearchManager.get_series_page(series_url)
+        dle_hash = SearchManager.get_dle_login_hash(self.provider, self.base_url)
+        series_url = f"{self.base_url}/engine/ajax/playlists.php?news_id={news_id}&xfield=playlist&user_hash={dle_hash}"
+        return SearchManager.get_series_page(self.provider, series_url)
 
     def load_player_page(self, query):
         # Load the master playlist for a series
