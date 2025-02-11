@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="stream2mediaserver",
-    version="0.1.4",
+    version="0.1.7",
     description="Prototype for locating TV series/anime streams",
     packages=find_packages(),
     install_requires=[
