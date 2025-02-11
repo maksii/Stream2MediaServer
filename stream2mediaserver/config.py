@@ -25,10 +25,10 @@ class ProviderConfig:
 def default_providers() -> Dict[str, bool]:
     """Default provider configuration."""
     return {
-        "animeon": True,
-        "anitube": True,
-        "uaflix": True,
-        "uakino": True
+        "animeon_provider": True,
+        "anitube_provider": True,
+        "uaflix_provider": True,
+        "uakino_provider": True
     }
 
 @dataclass
