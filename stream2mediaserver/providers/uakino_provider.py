@@ -1,4 +1,3 @@
-
 import time
 from stream2mediaserver.processors.covertor_manager import ConvertorManager
 from stream2mediaserver.processors.m3u8_manager import M3U8Manager
@@ -11,14 +10,31 @@ class UakinoProvider(ProviderBase):
         super().__init__(config)
         self.provider = "uakino"
         self.provider_type = "dle"
-        self.base_url = "https://uakino.club"
+        self.base_url = "https://uakino.me"
         self.search_url = f"{self.base_url}/engine/lazydev/dle_search/ajax.php"
         self.playlist_url_template = f"{self.base_url}/engine/ajax/playlists.php"
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'application/json, text/javascript, */*; q=0.01',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer': self.base_url,
+            'X-Requested-With': 'XMLHttpRequest'
+        }
 
 
     def search_title(self, query):
-        # Conduct a search and return search results
-        return SearchManager.search_movies(self.provider, query, self.base_url, self.search_url)
+        try:
+            # Pass headers to SearchManager
+            return SearchManager.search_movies(
+                self.provider, 
+                query, 
+                self.base_url, 
+                self.search_url,
+                headers=self.headers
+            )
+        except Exception as e:
+            print(f"Search error for {self.provider}: {str(e)}")
+            return None
 
     def load_details_page(self, query):
         # Extract ID from URL and fetch series details
