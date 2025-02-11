@@ -55,7 +55,8 @@ class SearchManager:
 
     @staticmethod
     def search_movies(provider: str, query: str, base_url: str, search_url: str,
-                     dle_hash: Optional[str] = None, headers: Optional[dict] = None) -> List[SearchResult]:
+                     dle_hash: Optional[str] = None, headers: Optional[dict] = None,
+                     form_data: Optional[dict] = None) -> List[SearchResult]:
         """Search for movies/series across providers.
         
         Args:
@@ -65,6 +66,7 @@ class SearchManager:
             search_url: Search endpoint URL
             dle_hash: Optional DLE login hash
             headers: Optional request headers
+            form_data: Optional form data for POST requests
             
         Returns:
             List of search results
@@ -82,11 +84,11 @@ class SearchManager:
             if provider == "uakino":
                 results = SearchManager._search_uakino(encoded_query, dle_hash, search_url, headers)
             elif provider == "anitube":
-                results = SearchManager._search_anitube(encoded_query, dle_hash, search_url)
+                results = SearchManager._search_anitube(encoded_query, dle_hash, search_url, headers, form_data)
             elif provider == "uaflix":
-                results = SearchManager._search_uaflix(encoded_query, search_url)
+                results = SearchManager._search_uaflix(encoded_query, search_url, headers)
             elif provider == "animeon":
-                results = SearchManager._search_animeon(encoded_query, search_url)
+                results = SearchManager._search_animeon(encoded_query, search_url, headers)
         except Exception as e:
             logger.error(f"Error searching {provider}: {str(e)}")
             return []
@@ -121,13 +123,13 @@ class SearchManager:
         return results
 
     @staticmethod
-    def _search_anitube(query: str, dle_hash: str, search_url: str) -> List[SearchResult]:
+    def _search_anitube(query: str, dle_hash: str, search_url: str, headers: Optional[dict], form_data: Optional[dict]) -> List[SearchResult]:
         """Search implementation for Anitube provider."""
         form_data = {
             'query': query,
             'user_hash': dle_hash
         }
-        response = RequestManager.post(search_url, data=form_data)
+        response = RequestManager.post(search_url, data=form_data, headers=headers)
         results = []
         if response and response.ok:
             soup = BeautifulSoup(response.text, 'html.parser')
@@ -140,9 +142,9 @@ class SearchManager:
         return results
 
     @staticmethod
-    def _search_uaflix(query: str, search_url: str) -> List[SearchResult]:
+    def _search_uaflix(query: str, search_url: str, headers: Optional[dict]) -> List[SearchResult]:
         """Search implementation for UAFlix provider."""
-        response = RequestManager.get(f'{search_url}{query}')
+        response = RequestManager.get(f'{search_url}{query}', headers=headers)
         results = []
         if response and response.ok:
             soup = BeautifulSoup(response.text, 'html.parser')
@@ -157,9 +159,9 @@ class SearchManager:
         return results
 
     @staticmethod
-    def _search_animeon(query: str, search_url: str) -> List[SearchResult]:
+    def _search_animeon(query: str, search_url: str, headers: Optional[dict]) -> List[SearchResult]:
         """Search implementation for Animeon provider."""
-        response = RequestManager.get(f'{search_url}/{query}?full=false')
+        response = RequestManager.get(f'{search_url}/{query}?full=false', headers=headers)
         results = []
         if response and response.ok:
             data = response.json()

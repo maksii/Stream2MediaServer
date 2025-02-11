@@ -15,13 +15,16 @@ class UakinoProvider(ProviderBase):
         self.search_url = f"{self.base_url}/engine/lazydev/dle_search/ajax.php"
         self.playlist_url_template = f"{self.base_url}/engine/ajax/playlists.php"
         
-        # Define headers
+        # Define headers for UAKino
         self.headers = {
             'User-Agent': self.config.provider_config.user_agent,
             'Accept': 'application/json, text/javascript, */*; q=0.01',
-            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Language': 'uk-UA,uk;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'X-Requested-With': 'XMLHttpRequest',
             'Referer': self.base_url,
-            'X-Requested-With': 'XMLHttpRequest'
+            'Origin': self.base_url,
+            'Connection': 'keep-alive'
         }
 
 
@@ -33,14 +36,17 @@ class UakinoProvider(ProviderBase):
                 logger.warning(f"Failed to retrieve dle_login_hash for query: {query}")
                 return []
                 
-            # Pass both dle_hash and headers
+            # Pass both dle_hash and headers with updated Content-Type
+            search_headers = self.headers.copy()
+            search_headers['Content-Type'] = 'application/x-www-form-urlencoded; charset=UTF-8'
+            
             results = SearchManager.search_movies(
                 self.provider, 
                 query, 
                 self.base_url, 
                 self.search_url,
                 dle_hash,
-                self.headers
+                search_headers
             )
             
             logger.info(f"Found {len(results)} results for query: {query}")

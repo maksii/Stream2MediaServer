@@ -17,7 +17,7 @@ from .utils.logger import logger
 
 # Provider mapping for dynamic loading
 PROVIDER_MAPPING: Dict[str, str] = {
-    "animeon_provider": "AnimeOnProvider",
+    "animeon_provider": "AnimeonProvider",
     "anitube_provider": "AnitubeProvider",
     "uakino_provider": "UakinoProvider",
     "uaflix_provider": "UaflixProvider"

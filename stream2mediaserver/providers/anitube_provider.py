@@ -21,9 +21,11 @@ class AnitubeProvider(ProviderBase):
             'User-Agent': self.config.provider_config.user_agent,
             'Accept': 'application/json, text/javascript, */*; q=0.01',
             'Accept-Language': 'uk-UA,uk;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
             'X-Requested-With': 'XMLHttpRequest',
             'Referer': self.base_url,
-            'Origin': self.base_url
+            'Origin': self.base_url,
+            'Connection': 'keep-alive'
         }
 
     def search_title(self, query):
@@ -34,14 +36,19 @@ class AnitubeProvider(ProviderBase):
                 logger.warning(f"Failed to retrieve dle_login_hash for query: {query}")
                 return []
                 
-            # Pass both dle_hash and headers
+            # Pass both dle_hash and headers with updated Content-Type
+            search_headers = self.headers.copy()
+            search_headers['Content-Type'] = 'application/x-www-form-urlencoded; charset=UTF-8'
+            
+            # Anitube expects 'query' parameter instead of 'story'
             results = SearchManager.search_movies(
                 self.provider,
                 query,
                 self.base_url,
                 self.search_url,
                 dle_hash,
-                self.headers
+                search_headers,
+                form_data={'query': query, 'user_hash': dle_hash}  # Specific form data for Anitube
             )
             
             logger.info(f"Found {len(results)} results for query: {query}")

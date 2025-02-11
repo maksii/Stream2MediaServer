@@ -31,7 +31,7 @@ class UaflixProvider(ProviderBase):
                 self.provider,
                 query,
                 self.base_url,
-                f"{self.search_url}{query}",
+                f"{self.search_url}{query}",  # Query will be encoded by SearchManager
                 headers=self.headers
             )
             
