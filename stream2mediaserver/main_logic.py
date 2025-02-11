@@ -128,6 +128,60 @@ class MainLogic:
             logger.error(f"Error processing item {item.title}: {e}")
             return False
 
+    def search_titles(self, provider_class, query):
+        provider = provider_class(self.config)
+        return provider.search_title(query)
+
+    def search_releases(self, query: str):
+        results = []
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future_to_provider = {}
+            for provider_name in [name for name, enabled in self.config.providers.items() if enabled]:
+                provider_class = self.get_provider_class(provider_name)
+                if provider_class:
+                    future = executor.submit(self.search_titles, provider_class, query)
+                    future_to_provider[future] = provider_name
+                else:
+                    logger.error(f"Provider {provider_name} could not be loaded.")
+
+            for future in concurrent.futures.as_completed(future_to_provider):
+                provider_name = future_to_provider[future]
+                try:
+                    provider_results = future.result()
+                    results.extend(provider_results)
+                    logger.info(f"Results from {provider_name} received.")
+                except Exception as exc:
+                    logger.error(f"{provider_name} generated an exception: {exc}")
+        return results
+
+    def search_releases_for_provider(self, provider_name: str, query: str):
+        provider_class = self.get_provider_class(provider_name)
+        if provider_class:
+            return self.search_titles(provider_class, query)
+        return []
+
+    def get_release_details(self, provider_name: str, release_url: str):
+        provider_class = self.get_provider_class(provider_name)
+        if provider_class:
+            provider = provider_class(self.config)
+            return provider.load_details_page(release_url)
+        return None
+
+    def get_details_for_all_releases(self, releases: List[Dict]):
+        details = []
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future_to_details = {
+                executor.submit(self.get_release_details, release['provider'], release['url']): release 
+                for release in releases
+            }
+            for future in concurrent.futures.as_completed(future_to_details):
+                release = future_to_details[future]
+                try:
+                    details.append(future.result())
+                except Exception as exc:
+                    logger.error(f"Error retrieving details for {release['url']}: {exc}")
+        return details
+
 def add_release_by_url(config):
     pass
 
@@ -142,57 +196,3 @@ def update_releases(config):
 
 def update_release(config):
     pass
-
-def search_titles(provider_class, query):
-    config = {}  # Configuration settings if any
-    provider = provider_class(config)
-    return provider.search_title(query)
-
-def search_releases(config):
-    search_query = config.args.query
-    results = []
-    
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        future_to_provider = {}
-        for provider_name in provider_mapping:
-            provider_class = get_provider_class(provider_name)
-            if provider_class:
-                future = executor.submit(search_titles, provider_class, search_query)
-                future_to_provider[future] = provider_name
-            else:
-                print(f"Provider {provider_name} could not be loaded.")
-
-        for future in concurrent.futures.as_completed(future_to_provider):
-            provider_name = future_to_provider[future]
-            try:
-                provider_results = future.result()
-                results.extend(provider_results)  # Assuming each result is a list of results
-                print(f"Results from {provider_name} received.")
-            except Exception as exc:
-                print(f"{provider_name} generated an exception: {exc}")
-    
-    return results
-
-def search_releases_for_provider(provider_name, query):
-    provider_class = get_provider_class(provider_name)
-    if provider_class:
-        return search_titles(provider_class, query)
-    return []
-
-def get_release_details(provider_name, release_url):
-    provider_class = get_provider_class(provider_name)
-    if provider_class:
-        provider_instance = provider_class({})
-        return provider_instance.load_details_page(release_url)
-
-def get_details_for_all_releases(releases):
-    details = []
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        future_to_details = {executor.submit(get_release_details, release['provider'], release['url']): release for release in releases}
-        for future in concurrent.futures.as_completed(future_to_details):
-            release = future_to_details[future]
-            try:
-                details.append(future.result())
-            except Exception as exc:
-                print(f"Error retrieving details for {release['url']}: {exc}")
-    return details
