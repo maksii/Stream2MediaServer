@@ -1,201 +1,254 @@
-import re
-from bs4 import BeautifulSoup
-from urllib.parse import quote, urlparse, urlunparse
-
-from stream2mediaserver.models.search_result import SearchResult
-from stream2mediaserver.models.series import Series
-from stream2mediaserver.processors.request_manager import RequestManager
+"""Search management module for content providers."""
 
 import html
-from urllib.parse import unquote
+import re
+from typing import List, Optional
+from urllib.parse import quote, unquote, urlparse, urlunparse
+
+from bs4 import BeautifulSoup
+
+from ..models.search_result import SearchResult
+from ..models.series import Series
+from ..utils.logger import logger
+from .request_manager import RequestManager
 
 class SearchManager:
+    """Manages search operations across different content providers."""
 
     @staticmethod
-    def get_dle_login_hash(provider, url, headers=None):
-        response = RequestManager().get(url, headers=headers)
-        if response.ok:
+    def get_dle_login_hash(provider: str, url: str, headers: Optional[dict] = None) -> Optional[str]:
+        """Get DLE login hash from the provider's page.
+        
+        Args:
+            provider: Provider identifier
+            url: Base URL of the provider
+            headers: Optional request headers
+            
+        Returns:
+            DLE login hash if found, None otherwise
+        """
+        response = RequestManager.get(url, headers=headers)
+        if response and response.ok:
             soup = BeautifulSoup(response.text, 'html.parser')
             script_text = soup.find('script', text=re.compile(r'var dle_login_hash'))
             if script_text:
                 match = re.search(r"var dle_login_hash = '(\w+)';", script_text.string)
                 if match:
                     return match.group(1)
+        logger.warning(f"Failed to get DLE login hash for {provider}")
         return None
 
     @staticmethod
-    def clean_text(text):
+    def clean_text(text: str) -> str:
+        """Clean and normalize text content.
+        
+        Args:
+            text: Text to clean
+            
+        Returns:
+            Cleaned text
+        """
         text = html.unescape(text)
         text = text.replace('\r', '').replace('\n', '')
-        # Replace multiple spaces with a single space
         text = re.sub(r'\s+', ' ', text)
         return text.strip()
 
     @staticmethod
-    def search_movies(provider, query, base_url, search_url, dle_hash=None, headers=None):
-        #TBD refactor to common calls, for now just ifs
-        if not dle_hash:
-            dle_hash = SearchManager.get_dle_login_hash(provider, base_url, headers)
+    def search_movies(provider: str, query: str, base_url: str, search_url: str,
+                     dle_hash: Optional[str] = None, headers: Optional[dict] = None) -> List[SearchResult]:
+        """Search for movies/series across providers.
         
-        if provider != "animeon":
+        Args:
+            provider: Provider identifier
+            query: Search query
+            base_url: Provider's base URL
+            search_url: Search endpoint URL
+            dle_hash: Optional DLE login hash
+            headers: Optional request headers
+            
+        Returns:
+            List of search results
+        """
+        if not dle_hash and provider != "animeon":
+            dle_hash = SearchManager.get_dle_login_hash(provider, base_url, headers)
             if not dle_hash:
-                print("Failed to retrieve dle_login_hash")
+                logger.error(f"Failed to get DLE login hash for {provider}")
+                return []
 
         encoded_query = quote(query)
-        
-        #uakino dle
-        if provider == "uakino":
-            form_data = {
-                'story': encoded_query,
-                'dle_hash': dle_hash,
-                'thisUrl': '/'
-            }
+        results = []
 
-            response = RequestManager.post(search_url, data=form_data, headers=headers)
-            results = []
-            if response.ok:
-                soup = BeautifulSoup(response.json()['content'], 'html.parser')
-                for link in soup.find_all('a', class_='search-result-link'):
-                    url = unquote(link.get('href', ''))
-                    poster = unquote(link.img.get('src', '')) if link.img else ''
-                    if poster:
-                        parsed_url = urlparse(poster)
-                        if not parsed_url.netloc:
-                            new_url = urlunparse(parsed_url._replace(scheme='https', netloc='uakino.me'))  # Updated domain
-                            poster = new_url
-                    # Extracting and cleaning the name
-                    name = link.find('span', class_='searchheading')
-                    name = SearchManager.clean_text(name.get_text()) if name else ''
+        try:
+            if provider == "uakino":
+                results = SearchManager._search_uakino(encoded_query, dle_hash, search_url, headers)
+            elif provider == "anitube":
+                results = SearchManager._search_anitube(encoded_query, dle_hash, search_url)
+            elif provider == "uaflix":
+                results = SearchManager._search_uaflix(encoded_query, search_url)
+            elif provider == "animeon":
+                results = SearchManager._search_animeon(encoded_query, search_url)
+        except Exception as e:
+            logger.error(f"Error searching {provider}: {str(e)}")
+            return []
 
-                    # Extracting and cleaning the English name
-                    name_eng = link.find('span', class_='search-orig-title')
-                    name_eng = SearchManager.clean_text(name_eng.get_text()) if name_eng else ''
-                    results.append(SearchResult(link=url, image_url=poster, title=name, title_eng=name_eng, provider=provider))
-            return results
-        
-        #anitube dle
-        if provider == "anitube":
-            form_data = {
-                'query': query,
-                'user_hash': dle_hash
-            }
-
-            response = RequestManager.post(search_url, data=form_data)
-            results = []
-            if response.ok:
-                soup = BeautifulSoup(response.text, 'html.parser')
-                for link in soup.find_all('a', style="display: block;"):
-                    url = unquote(link.get('href', ''))
-                    poster = unquote(link.img.get('src', '')) if link.img else ''
-
-                    # Extracting and cleaning the name
-                    name = link.find('b', class_='searchheading_title')
-                    name = SearchManager.clean_text(name.get_text()) if name else ''
-
-                    # Set English name to 'Not Specified' as there is no corresponding element
-                    name_eng = 'Not Specified'
-
-                    results.append(SearchResult(link=url, image_url=poster, title=name, title_eng=name_eng, provider=provider))
-            return results
-
-        #uaflix dle
-        if provider == "uaflix":
-
-            response = RequestManager.get(f'{search_url}{encoded_query}')
-            results = []
-            if response.ok:
-                soup = BeautifulSoup(response.text, 'html.parser')
-                for link in soup.find_all('a', class_='sres-wrap clearfix'):
-                    url = unquote(link.get('href', ''))
-                    poster = unquote(link.find('img').get('src', ''))
-                    if not poster.startswith('http'):
-                        poster = 'https://uaflix.net' + poster
-
-                    # Extracting and cleaning the name
-                    name = link.find('h2').get_text().split('/')[0].strip()
-
-                    # Extracting and cleaning the English name
-                    name_eng = link.find('h2').get_text().split('/')[1].strip() if '/' in link.find('h2').get_text() else 'Not Specified'
-
-                    results.append(SearchResult(link=url, image_url=poster, title=name, title_eng=name_eng, provider=provider))
-            return results
-        
-        #animeon custom json
-        if provider == "animeon":
-
-            response = RequestManager.get(f'{search_url}/{encoded_query}?full=false')
-            results = []
-            if response.ok:
-                data = response.json()
-                for item in data['result']:
-                    url = f"https://animeon.club/api/anime/{item['id']}"
-                    poster = ""
-                    if item.get('poster'):
-                        poster = f"https://animeon.club/api/uploads/images/{item['poster']}"
-                    elif item.get('image') and item['image'].get('original'):
-                        poster = f"https://animeon.club/api/uploads/images/{item['image']['original']}"
-                    elif item.get('image') and item['image'].get('preview'):
-                        poster = f"https://animeon.club/api/uploads/images/{item['image']['preview']}"
-
-                    # Extracting title in Ukrainian
-                    name = item['titleUa']
-
-                    # Extracting title in English
-                    name_eng = item['titleEn']
-
-                    results.append(SearchResult(link=url, image_url=poster, title=name, title_eng=name_eng, provider=provider))
-            return results
+        return results
 
     @staticmethod
-    def get_series_page(provider, series_url):
+    def _search_uakino(query: str, dle_hash: str, search_url: str, headers: Optional[dict]) -> List[SearchResult]:
+        """Search implementation for UAKino provider."""
+        form_data = {
+            'story': query,
+            'dle_hash': dle_hash,
+            'thisUrl': '/'
+        }
+        response = RequestManager.post(search_url, data=form_data, headers=headers)
+        results = []
+        if response and response.ok:
+            soup = BeautifulSoup(response.json()['content'], 'html.parser')
+            for link in soup.find_all('a', class_='search-result-link'):
+                url = unquote(link.get('href', ''))
+                poster = unquote(link.img.get('src', '')) if link.img else ''
+                if poster:
+                    parsed_url = urlparse(poster)
+                    if not parsed_url.netloc:
+                        new_url = urlunparse(parsed_url._replace(scheme='https', netloc='uakino.me'))
+                        poster = new_url
+                name = link.find('span', class_='searchheading')
+                name = SearchManager.clean_text(name.get_text()) if name else ''
+                name_eng = link.find('span', class_='search-orig-title')
+                name_eng = SearchManager.clean_text(name_eng.get_text()) if name_eng else ''
+                results.append(SearchResult(link=url, image_url=poster, title=name, title_eng=name_eng, provider="uakino"))
+        return results
+
+    @staticmethod
+    def _search_anitube(query: str, dle_hash: str, search_url: str) -> List[SearchResult]:
+        """Search implementation for Anitube provider."""
+        form_data = {
+            'query': query,
+            'user_hash': dle_hash
+        }
+        response = RequestManager.post(search_url, data=form_data)
+        results = []
+        if response and response.ok:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            for link in soup.find_all('a', style="display: block;"):
+                url = unquote(link.get('href', ''))
+                poster = unquote(link.img.get('src', '')) if link.img else ''
+                name = link.find('b', class_='searchheading_title')
+                name = SearchManager.clean_text(name.get_text()) if name else ''
+                results.append(SearchResult(link=url, image_url=poster, title=name, title_eng='Not Specified', provider="anitube"))
+        return results
+
+    @staticmethod
+    def _search_uaflix(query: str, search_url: str) -> List[SearchResult]:
+        """Search implementation for UAFlix provider."""
+        response = RequestManager.get(f'{search_url}{query}')
+        results = []
+        if response and response.ok:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            for link in soup.find_all('a', class_='sres-wrap clearfix'):
+                url = unquote(link.get('href', ''))
+                poster = unquote(link.find('img').get('src', ''))
+                if not poster.startswith('http'):
+                    poster = 'https://uafix.net' + poster
+                name = link.find('h2').get_text().split('/')[0].strip()
+                name_eng = link.find('h2').get_text().split('/')[1].strip() if '/' in link.find('h2').get_text() else 'Not Specified'
+                results.append(SearchResult(link=url, image_url=poster, title=name, title_eng=name_eng, provider="uaflix"))
+        return results
+
+    @staticmethod
+    def _search_animeon(query: str, search_url: str) -> List[SearchResult]:
+        """Search implementation for Animeon provider."""
+        response = RequestManager.get(f'{search_url}/{query}?full=false')
+        results = []
+        if response and response.ok:
+            data = response.json()
+            for item in data['result']:
+                url = f"https://animeon.club/api/anime/{item['id']}"
+                poster = ""
+                if item.get('poster'):
+                    poster = f"https://animeon.club/api/uploads/images/{item['poster']}"
+                elif item.get('image') and item['image'].get('original'):
+                    poster = f"https://animeon.club/api/uploads/images/{item['image']['original']}"
+                elif item.get('image') and item['image'].get('preview'):
+                    poster = f"https://animeon.club/api/uploads/images/{item['image']['preview']}"
+                results.append(SearchResult(
+                    link=url,
+                    image_url=poster,
+                    title=item['titleUa'],
+                    title_eng=item['titleEn'],
+                    provider="animeon"
+                ))
+        return results
+
+    @staticmethod
+    def get_series_page(provider: str, series_url: str) -> List[Series]:
+        """Get series information from a provider's page.
+        
+        Args:
+            provider: Provider identifier
+            series_url: URL of the series page
+            
+        Returns:
+            List of series objects
+        """
         response = RequestManager.get(series_url)
-        series_list = []
-        if provider == "uakino":
-            if response.ok:
-                
-                soup = BeautifulSoup(response.json()['response'], 'html.parser')
-                for ul in soup.find_all('ul'):
-                    for li in ul.find_all('li', attrs={"data-id": True, "data-file": True}):
-                        studio_id = li['data-id']
-                        studio_name = li['data-voice']
-                        series = li.text.strip()
-                        video_url = f'https:{li["data-file"]}'
-                        series_list.append(Series(studio_id, studio_name, series, video_url))
-                return series_list
-        if provider == "anitube":
-                soup = BeautifulSoup(response.json()['response'], 'html.parser')
-                # Find all <li> elements that contain series information
-                series_items = soup.find_all('li', attrs={'data-file': True})
+        if not response or not response.ok:
+            logger.error(f"Failed to get series page from {provider}")
+            return []
 
-                # Iterate through each series item to extract necessary details
-                for item in series_items:
-                    # Extract the studio ID from the data-id attribute
-                    studio_id = item['data-id']
-
-                    # Find the studio name by navigating up to the parent <ul> and then to the previous <ul>
-                    # Then finding the corresponding <li> with the same base data-id (up to the second last underscore)
-                    base_id = '_'.join(studio_id.split('_')[:-1])
-                    studio_name_li = soup.find('li', attrs={'data-id': base_id})
-                    studio_name = studio_name_li.text if studio_name_li else "Unknown"
-
-                    # Extract series number from the text of the <li> element
-                    series = item.text.strip()
-
-                    # Extract the video URL from the data-file attribute
-                    video_url = item['data-file']
-                    series_list.append(Series(studio_id, studio_name, series, video_url))
-                return series_list
+        try:
+            if provider == "uakino":
+                return SearchManager._parse_uakino_series(response)
+            elif provider == "anitube":
+                return SearchManager._parse_anitube_series(response)
+        except Exception as e:
+            logger.error(f"Error parsing series page from {provider}: {str(e)}")
+            
         return []
 
     @staticmethod
-    def user_select_series(series_list):
-        for index, series in enumerate(series_list):
-            print(f"{index + 1}: {series.series} ({series.studio_name})")
-        choice = int(input("Choose a series by number: ")) - 1
-        return series_list[choice]
+    def _parse_uakino_series(response) -> List[Series]:
+        """Parse series information from UAKino response."""
+        series_list = []
+        soup = BeautifulSoup(response.json()['response'], 'html.parser')
+        for ul in soup.find_all('ul'):
+            for li in ul.find_all('li', attrs={"data-id": True, "data-file": True}):
+                series_list.append(Series(
+                    studio_id=li['data-id'],
+                    studio_name=li['data-voice'],
+                    series=li.text.strip(),
+                    video_url=f'https:{li["data-file"]}'
+                ))
+        return series_list
 
     @staticmethod
-    def extract_id_from_url(url):
+    def _parse_anitube_series(response) -> List[Series]:
+        """Parse series information from Anitube response."""
+        series_list = []
+        soup = BeautifulSoup(response.json()['response'], 'html.parser')
+        for item in soup.find_all('li', attrs={'data-file': True}):
+            studio_id = item['data-id']
+            base_id = '_'.join(studio_id.split('_')[:-1])
+            studio_name_li = soup.find('li', attrs={'data-id': base_id})
+            series_list.append(Series(
+                studio_id=studio_id,
+                studio_name=studio_name_li.text if studio_name_li else "Unknown",
+                series=item.text.strip(),
+                video_url=item['data-file']
+            ))
+        return series_list
+
+    @staticmethod
+    def extract_id_from_url(url: str) -> Optional[str]:
+        """Extract content ID from URL.
+        
+        Args:
+            url: Content URL
+            
+        Returns:
+            Content ID if found, None otherwise
+        """
         match = re.search(r'/(\d+)-|/(\d+)\.html', url)
         if match:
             return match.group(1) if match.group(1) else match.group(2)

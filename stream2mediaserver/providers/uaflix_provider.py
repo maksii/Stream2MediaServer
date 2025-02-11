@@ -1,16 +1,21 @@
+"""UAFlix provider implementation."""
 
 import time
-from stream2mediaserver.processors.covertor_manager import ConvertorManager
-from stream2mediaserver.processors.m3u8_manager import M3U8Manager
-from stream2mediaserver.processors.search_manager import SearchManager
-from stream2mediaserver.providers.provider_base import ProviderBase
+import requests
+from bs4 import BeautifulSoup
+
+from ..processors.covertor_manager import ConvertorManager
+from ..processors.m3u8_manager import M3U8Manager
+from ..processors.search_manager import SearchManager
+from ..providers.provider_base import ProviderBase
+from ..utils.logger import logger
 
 class UaflixProvider(ProviderBase):
     def __init__(self, config):
         super().__init__(config)
         self.provider = "uaflix"
         self.provider_type = "dle"
-        self.base_url = "https://uaflix.net/"
+        self.base_url = "https://uafix.net/"
         self.search_url = f"{self.base_url}/index.php?do=search&subaction=search&story="
         self.playlist_url_template = f"{self.base_url}/engine/ajax/playlists.php"
 

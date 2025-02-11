@@ -1,11 +1,17 @@
+"""M3U8 playlist processing manager."""
+
 import os
 import re
 import m3u8
 import requests
 
-from stream2mediaserver.processors.request_manager import RequestManager
+from ..utils.logger import logger
+from .request_manager import RequestManager
 
 class M3U8Manager:
+    def __init__(self):
+        self.request_manager = RequestManager()
+
     @staticmethod
     def load_m3u8(url, headers=None):
         headers = headers if headers is not None else {

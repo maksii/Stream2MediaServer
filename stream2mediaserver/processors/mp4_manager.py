@@ -1,11 +1,14 @@
+"""MP4 file processing manager."""
+
 import os
 import re
+import requests
 from bs4 import BeautifulSoup
 import m3u8
-import requests
 
-from stream2mediaserver.processors.file_manager import FileManager
-from stream2mediaserver.processors.request_manager import RequestManager
+from ..utils.logger import logger
+from .file_manager import FileManager
+from .request_manager import RequestManager
 
 class MP4Manager:
     @staticmethod
