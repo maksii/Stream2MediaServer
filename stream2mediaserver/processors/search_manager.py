@@ -144,7 +144,7 @@ class SearchManager:
     @staticmethod
     def _search_uaflix(query: str, search_url: str, headers: Optional[dict]) -> List[SearchResult]:
         """Search implementation for UAFlix provider."""
-        response = RequestManager.get(f'{search_url}{query}', headers=headers)
+        response = RequestManager.get(search_url + quote(query), headers=headers)
         results = []
         if response and response.ok:
             soup = BeautifulSoup(response.text, 'html.parser')
@@ -161,26 +161,30 @@ class SearchManager:
     @staticmethod
     def _search_animeon(query: str, search_url: str, headers: Optional[dict]) -> List[SearchResult]:
         """Search implementation for Animeon provider."""
-        response = RequestManager.get(f'{search_url}/{query}?full=false', headers=headers)
+        url = f"{search_url}/{quote(query)}?full=false"
+        response = RequestManager.get(url, headers=headers)
         results = []
         if response and response.ok:
-            data = response.json()
-            for item in data['result']:
-                url = f"https://animeon.club/api/anime/{item['id']}"
-                poster = ""
-                if item.get('poster'):
-                    poster = f"https://animeon.club/api/uploads/images/{item['poster']}"
-                elif item.get('image') and item['image'].get('original'):
-                    poster = f"https://animeon.club/api/uploads/images/{item['image']['original']}"
-                elif item.get('image') and item['image'].get('preview'):
-                    poster = f"https://animeon.club/api/uploads/images/{item['image']['preview']}"
-                results.append(SearchResult(
-                    link=url,
-                    image_url=poster,
-                    title=item['titleUa'],
-                    title_eng=item['titleEn'],
-                    provider="animeon"
-                ))
+            try:
+                data = response.json()
+                for item in data.get('result', []):
+                    url = f"https://animeon.club/api/anime/{item['id']}"
+                    poster = ""
+                    if item.get('poster'):
+                        poster = f"https://animeon.club/api/uploads/images/{item['poster']}"
+                    elif item.get('image') and item['image'].get('original'):
+                        poster = f"https://animeon.club/api/uploads/images/{item['image']['original']}"
+                    elif item.get('image') and item['image'].get('preview'):
+                        poster = f"https://animeon.club/api/uploads/images/{item['image']['preview']}"
+                    results.append(SearchResult(
+                        link=url,
+                        image_url=poster,
+                        title=item.get('titleUa', ''),
+                        title_eng=item.get('titleEn', ''),
+                        provider="animeon"
+                    ))
+            except ValueError as e:
+                logger.error(f"Failed to parse JSON response from Animeon: {str(e)}")
         return results
 
     @staticmethod
