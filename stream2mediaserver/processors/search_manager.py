@@ -12,8 +12,8 @@ from urllib.parse import unquote
 class SearchManager:
 
     @staticmethod
-    def get_dle_login_hash(provider, url):
-        response = RequestManager().get(url)
+    def get_dle_login_hash(provider, url, headers=None):
+        response = RequestManager().get(url, headers=headers)
         if response.ok:
             soup = BeautifulSoup(response.text, 'html.parser')
             script_text = soup.find('script', text=re.compile(r'var dle_login_hash'))
@@ -32,9 +32,10 @@ class SearchManager:
         return text.strip()
 
     @staticmethod
-    def search_movies(provider, query, base_url, search_url):
+    def search_movies(provider, query, base_url, search_url, dle_hash=None, headers=None):
         #TBD refactor to common calls, for now just ifs
-        dle_hash = SearchManager.get_dle_login_hash(provider, base_url)
+        if not dle_hash:
+            dle_hash = SearchManager.get_dle_login_hash(provider, base_url, headers)
         
         if provider != "animeon":
             if not dle_hash:
@@ -50,7 +51,7 @@ class SearchManager:
                 'thisUrl': '/'
             }
 
-            response = RequestManager.post(search_url, data=form_data)
+            response = RequestManager.post(search_url, data=form_data, headers=headers)
             results = []
             if response.ok:
                 soup = BeautifulSoup(response.json()['content'], 'html.parser')
@@ -60,7 +61,7 @@ class SearchManager:
                     if poster:
                         parsed_url = urlparse(poster)
                         if not parsed_url.netloc:
-                            new_url = urlunparse(parsed_url._replace(scheme='https', netloc='uakino.club'))
+                            new_url = urlunparse(parsed_url._replace(scheme='https', netloc='uakino.me'))  # Updated domain
                             poster = new_url
                     # Extracting and cleaning the name
                     name = link.find('span', class_='searchheading')

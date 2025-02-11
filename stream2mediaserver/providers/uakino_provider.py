@@ -13,7 +13,9 @@ class UakinoProvider(ProviderBase):
         self.base_url = "https://uakino.me"
         self.search_url = f"{self.base_url}/engine/lazydev/dle_search/ajax.php"
         self.playlist_url_template = f"{self.base_url}/engine/ajax/playlists.php"
-        self.headers = {
+        
+        # Add headers to config
+        self.config['headers'] = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
             'Accept': 'application/json, text/javascript, */*; q=0.01',
             'Accept-Language': 'en-US,en;q=0.9',
@@ -24,17 +26,24 @@ class UakinoProvider(ProviderBase):
 
     def search_title(self, query):
         try:
-            # Pass headers to SearchManager
+            # Get dle_hash with headers
+            dle_hash = SearchManager.get_dle_login_hash(self.provider, self.base_url, self.config.get('headers'))
+            if not dle_hash:
+                print("Failed to retrieve dle_login_hash")
+                return []
+                
+            # Pass both dle_hash and headers
             return SearchManager.search_movies(
                 self.provider, 
                 query, 
                 self.base_url, 
                 self.search_url,
-                headers=self.headers
+                dle_hash,
+                self.config.get('headers')
             )
         except Exception as e:
             print(f"Search error for {self.provider}: {str(e)}")
-            return None
+            return []
 
     def load_details_page(self, query):
         # Extract ID from URL and fetch series details

@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="stream2mediaserver",
-    version="0.1.0",
+    version="0.1.2",
     description="Addon to facilitate locating and adding TV series/anime streams with standardized naming for Sonarr/Plex/Jellyfin integration.",
     url="https://github.com/maksii/stream2mediaserver",
     packages=find_packages(),
