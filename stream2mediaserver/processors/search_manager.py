@@ -125,10 +125,14 @@ class SearchManager:
     @staticmethod
     def _search_anitube(query: str, dle_hash: str, search_url: str, headers: Optional[dict], form_data: Optional[dict]) -> List[SearchResult]:
         """Search implementation for Anitube provider."""
+        # For Anitube, we need to use the original query (with spaces) and let requests handle the encoding
+        original_query = unquote(query)  # Convert back from %20 to spaces
+        
         form_data = {
-            'query': query,
+            'query': original_query,  # Will be properly encoded as + by requests
             'user_hash': dle_hash
         }
+        
         response = RequestManager.post(search_url, data=form_data, headers=headers)
         results = []
         if response and response.ok:
@@ -161,7 +165,7 @@ class SearchManager:
     @staticmethod
     def _search_animeon(query: str, search_url: str, headers: Optional[dict]) -> List[SearchResult]:
         """Search implementation for Animeon provider."""
-        url = f"{search_url}/{quote(query)}?full=false"
+        url = f"{search_url}/{query}?full=false"
         response = RequestManager.get(url, headers=headers)
         results = []
         if response and response.ok:

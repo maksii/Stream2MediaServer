@@ -19,13 +19,9 @@ class AnitubeProvider(ProviderBase):
         # Define headers for Anitube
         self.headers = {
             'User-Agent': self.config.provider_config.user_agent,
-            'Accept': 'application/json, text/javascript, */*; q=0.01',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9',
             'Accept-Language': 'uk-UA,uk;q=0.9,en-US;q=0.8,en;q=0.7',
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-            'X-Requested-With': 'XMLHttpRequest',
-            'Referer': self.base_url,
-            'Origin': self.base_url,
-            'Connection': 'keep-alive'
+            'Referer': self.base_url
         }
 
     def search_title(self, query):

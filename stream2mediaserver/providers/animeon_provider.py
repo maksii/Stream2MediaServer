@@ -1,6 +1,7 @@
 """Animeon provider implementation."""
 
 import time
+from urllib.parse import quote
 from ..processors.covertor_manager import ConvertorManager
 from ..processors.m3u8_manager import M3U8Manager
 from ..processors.search_manager import SearchManager
@@ -27,13 +28,20 @@ class AnimeonProvider(ProviderBase):
 
     def search_title(self, query):
         try:
-            # Animeon uses a REST API, no need for dle_hash
+            # Add required headers for the API
+            search_headers = self.headers.copy()
+            search_headers.update({
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            })
+            
+            # Pass the base search URL and let SearchManager handle the query
             results = SearchManager.search_movies(
                 self.provider,
                 query,
                 self.base_url,
-                f"{self.search_url}/{query}?full=false",
-                headers=self.headers
+                self.search_url,  # Pass base search URL without query
+                headers=search_headers
             )
             
             logger.info(f"Found {len(results)} results for query: {query}")

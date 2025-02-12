@@ -1,4 +1,7 @@
 import time
+import requests
+import re
+from bs4 import BeautifulSoup
 from ..processors.covertor_manager import ConvertorManager
 from ..processors.m3u8_manager import M3U8Manager
 from ..processors.search_manager import SearchManager
@@ -18,27 +21,51 @@ class UakinoProvider(ProviderBase):
         # Define headers for UAKino
         self.headers = {
             'User-Agent': self.config.provider_config.user_agent,
-            'Accept': 'application/json, text/javascript, */*; q=0.01',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9',
             'Accept-Language': 'uk-UA,uk;q=0.9,en-US;q=0.8,en;q=0.7',
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-            'X-Requested-With': 'XMLHttpRequest',
-            'Referer': self.base_url,
-            'Origin': self.base_url,
-            'Connection': 'keep-alive'
+            'Referer': self.base_url
         }
 
 
     def search_title(self, query):
         try:
-            # Get dle_hash with headers
-            dle_hash = SearchManager.get_dle_login_hash(self.provider, self.base_url, self.headers)
+            # Initialize session for cookie persistence
+            session = requests.Session()
+            session.headers.update(self.headers)
+            
+            # First, get the main page to establish session and cookies
+            main_page = session.get(self.base_url)
+            if not main_page.ok:
+                logger.error(f"Failed to access main page: {main_page.status_code}")
+                return []
+            
+            # Extract DLE hash from the main page
+            soup = BeautifulSoup(main_page.text, 'html.parser')
+            script_text = soup.find('script', text=re.compile(r'var dle_login_hash'))
+            dle_hash = None
+            
+            if script_text:
+                match = re.search(r"var dle_login_hash = '(\w+)';", script_text.string)
+                if match:
+                    dle_hash = match.group(1)
+            
             if not dle_hash:
                 logger.warning(f"Failed to retrieve dle_login_hash for query: {query}")
                 return []
-                
-            # Pass both dle_hash and headers with updated Content-Type
+            
+            # Prepare search request with proper headers and cookies
             search_headers = self.headers.copy()
-            search_headers['Content-Type'] = 'application/x-www-form-urlencoded; charset=UTF-8'
+            search_headers.update({
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'X-Requested-With': 'XMLHttpRequest',
+                'Cookie': f"dle_hash={dle_hash}; {'; '.join(f'{k}={v}' for k, v in session.cookies.items())}"
+            })
+            
+            # Prepare search data
+            search_data = {
+                'query': query,
+                'dle_login_hash': dle_hash
+            }
             
             results = SearchManager.search_movies(
                 self.provider, 
@@ -46,7 +73,8 @@ class UakinoProvider(ProviderBase):
                 self.base_url, 
                 self.search_url,
                 dle_hash,
-                search_headers
+                search_headers,
+                search_data
             )
             
             logger.info(f"Found {len(results)} results for query: {query}")
