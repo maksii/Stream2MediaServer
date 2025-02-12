@@ -1,25 +1,33 @@
-from parser.animeon_parser import check_new_animes, clear_processed_ids, create_connection, process_new_anime_ids
-from types import SimpleNamespace
+"""Main entry point for stream2mediaserver."""
+
 import concurrent.futures
 from importlib import import_module
+from types import SimpleNamespace
 
-from main_logic import get_details_for_all_releases, get_release_details, search_releases, search_releases_for_provider
+from .main_logic import (
+    get_details_for_all_releases,
+    get_release_details,
+    search_releases,
+    search_releases_for_provider
+)
 
 def main():
-    #config = SimpleNamespace(args=SimpleNamespace(query="The New Gate"))
+    # Test search for a specific provider
+    anitube_results = search_releases_for_provider("anitube_provider", "The New Gate")
+    if anitube_results:
+        anitube_details = get_release_details("anitube_provider", anitube_results[0].link)
+    
+    uakino_results = search_releases_for_provider("uakino_provider", "The New Gate")
+    if uakino_results:
+        uakino_details = get_release_details("uakino_provider", uakino_results[0].link)
+    
+    print("Stream2MediaServer initialized")
+    
+        #config = SimpleNamespace(args=SimpleNamespace(query="The New Gate"))
     #results_all = search_releases(config)
     #for result in results_all:
     #    print(f"Found: {result.provider} - {result.title}")
-    
-
-    anitube_providerresultsSingle = search_releases_for_provider("anitube_provider", "The New Gate")
-    anitube_providerdetailsSingle = get_release_details("anitube_provider", anitube_providerdetailsSingle[0].link)
-    uakino_providerresultsSingle = search_releases_for_provider("uakino_provider", "The New Gate")
-    uakino_providerdetailsSingle = get_release_details("uakino_provider", uakino_providerresultsSingle[0].link)
-    
-    
-    print("No Actions. Stream2MediaServer")
-    #details_all = get_details_for_all_releases(results_all)
+        #details_all = get_details_for_all_releases(results_all)
     
     #search_query = "Брама"
     #results = []
@@ -100,7 +108,6 @@ def main():
     ##case:generic
     #read titles
     #foreach title ##case:download
-    
     
 
 if __name__ == "__main__":
