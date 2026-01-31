@@ -30,7 +30,7 @@ class SearchManager:
         response = RequestManager.get(url, headers=headers)
         if response and response.ok:
             soup = BeautifulSoup(response.text, 'html.parser')
-            script_text = soup.find('script', text=re.compile(r'var dle_login_hash'))
+            script_text = soup.find('script', string=re.compile(r'var dle_login_hash'))
             if script_text:
                 match = re.search(r"var dle_login_hash = '(\w+)';", script_text.string)
                 if match:

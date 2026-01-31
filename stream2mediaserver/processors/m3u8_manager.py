@@ -3,9 +3,6 @@
 import os
 import re
 import m3u8
-import requests
-
-from ..utils.logger import logger
 from .request_manager import RequestManager
 
 class M3U8Manager:

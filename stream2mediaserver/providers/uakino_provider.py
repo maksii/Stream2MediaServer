@@ -41,7 +41,7 @@ class UakinoProvider(ProviderBase):
             
             # Extract DLE hash from the main page
             soup = BeautifulSoup(main_page.text, 'html.parser')
-            script_text = soup.find('script', text=re.compile(r'var dle_login_hash'))
+            script_text = soup.find('script', string=re.compile(r'var dle_login_hash'))
             dle_hash = None
             
             if script_text:
