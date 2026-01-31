@@ -1,12 +1,6 @@
 """MP4 file processing manager."""
 
-import os
-import re
-import requests
 from bs4 import BeautifulSoup
-import m3u8
-
-from ..utils.logger import logger
 from .file_manager import FileManager
 from .request_manager import RequestManager
 

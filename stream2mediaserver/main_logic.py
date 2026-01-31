@@ -44,7 +44,7 @@ class MainLogic:
         Returns:
             Provider class if found, None otherwise
         """
-        if not provider_name in PROVIDER_MAPPING:
+        if provider_name not in PROVIDER_MAPPING:
             logger.error(f"Unknown provider: {provider_name}")
             return None
 

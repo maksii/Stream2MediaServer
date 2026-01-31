@@ -335,8 +335,8 @@ def initiate_scrap(conn):
 def add_new_anime(anime_data, conn):
         insert_anime_into_db(anime_data, conn)
         
-        if anime_data['franchise'] != None:
-            franchise_data = fetch_api(f'https://animeon.club/api/franchise/{anime_data['franchise']['id']}')
+        if anime_data['franchise'] is not None:
+            franchise_data = fetch_api(f"https://animeon.club/api/franchise/{anime_data['franchise']['id']}")
             if franchise_data:
                 insert_franchise_data(franchise_data, conn)
             
@@ -350,7 +350,7 @@ def add_new_anime(anime_data, conn):
                         for episode in episodes:
                             video_url = fetch_api(f'https://animeon.club/api/anime/player/episode/{episode["id"]}')
                             
-                            if video_url == None:
+                            if video_url is None:
                                 video_url = "Blocked"
                             insert_fundub_and_episodes(anime_data['id'], fd, episode, video_url, conn)
         
@@ -379,7 +379,7 @@ def clear_processed_ids(conn):
     conn.commit()
 
 def check_new_animes(conn):
-    anime_data = fetch_api(f'https://animeon.club/api/anime')
+    anime_data = fetch_api("https://animeon.club/api/anime")
     populate_new_anime_ids(anime_data['results'], conn)
 
 def delta(conn):
