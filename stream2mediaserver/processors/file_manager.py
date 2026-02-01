@@ -1,10 +1,12 @@
 import os
 import urllib.request
 
+from ..utils.logger import logger
+
 
 class FileManager:
     @staticmethod
-    def download_file(self, url, destination_folder, file_name):
+    def download_file(url, destination_folder, file_name):
         if not os.path.exists(destination_folder):
             os.makedirs(
                 destination_folder, exist_ok=True
@@ -18,18 +20,18 @@ class FileManager:
             ):
                 out_file.write(response.read())
         except urllib.error.URLError as e:
-            print(f"Failed to download the file from {url}. Error: {e}")
+            logger.error(f"Failed to download the file from {url}. Error: {e}")
             return None
         return file_path
 
     @staticmethod
-    def concatenate_files(self, segment_files, output_file):
+    def concatenate_files(segment_files, output_file):
         try:
             with open(output_file, "wb") as outfile:
                 for segment_file in segment_files:
                     with open(segment_file, "rb") as readfile:
                         outfile.write(readfile.read())
         except IOError as e:
-            print(f"Error during file concatenation. Error: {e}")
+            logger.error(f"Error during file concatenation. Error: {e}")
             return None
         return output_file

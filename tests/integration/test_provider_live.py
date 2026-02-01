@@ -34,16 +34,16 @@ class ProviderLiveIntegrationTests(unittest.TestCase):
         self.assertTrue(results[0].link)
 
     def test_live_animeon_search(self):
-        self._run_live_search(AnimeonProvider, "Naruto")
+        self._run_live_search(AnimeonProvider, "Anime")
 
     def test_live_anitube_search(self):
-        self._run_live_search(AnitubeProvider, "Naruto")
+        self._run_live_search(AnitubeProvider, "Anime")
 
     def test_live_uaflix_search(self):
-        self._run_live_search(UaflixProvider, "Avatar")
+        self._run_live_search(UaflixProvider, "Anime")
 
     def test_live_uakino_search(self):
-        self._run_live_search(UakinoProvider, "Avatar")
+        self._run_live_search(UakinoProvider, "Anime")
 
 
 if __name__ == "__main__":

@@ -23,7 +23,7 @@ class FakeProvider:
         result.url = result.link
         return [result]
 
-    async def load_details_page(self, url):
+    def load_details_page(self, url):
         return Series(studio_id="1", studio_name="Studio", series="Episode 1", url=url)
 
 
@@ -31,7 +31,7 @@ class FakeConvertor:
     def __init__(self, config):
         self.config = config
 
-    async def process(self, item):
+    def process(self, item):
         return True
 
 

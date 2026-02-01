@@ -1,13 +1,9 @@
-"""Main logic module for stream2mediaserver.
+"""Main logic module for stream2mediaserver."""
 
-This module handles the core functionality of searching and processing media content
-from various providers. It implements dynamic provider loading and concurrent operations
-for efficient content retrieval.
-"""
-
-import concurrent.futures
+import asyncio
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from importlib import import_module
-from typing import Dict, List, Optional, Type, Union
+from typing import Dict, Iterable, List, Optional, Type, Union
 
 from .config import AppConfig, config as default_config
 from .models.search_result import SearchResult
@@ -34,7 +30,7 @@ class MainLogic:
             config: Optional custom configuration. Uses default if not provided.
         """
         self.config = config or default_config
-        self._provider_instances: Dict[str, ProviderBase] = {}
+        self._provider_classes: Dict[str, Type[ProviderBase]] = {}
 
     def get_provider_class(self, provider_name: str) -> Optional[Type[ProviderBase]]:
         """Get provider class by name.
@@ -45,6 +41,9 @@ class MainLogic:
         Returns:
             Provider class if found, None otherwise
         """
+        if provider_name in self._provider_classes:
+            return self._provider_classes[provider_name]
+
         if provider_name not in PROVIDER_MAPPING:
             logger.error(f"Unknown provider: {provider_name}")
             return None
@@ -52,7 +51,9 @@ class MainLogic:
         class_name = PROVIDER_MAPPING[provider_name]
         try:
             module = import_module(f"stream2mediaserver.providers.{provider_name}")
-            return getattr(module, class_name)
+            provider_class = getattr(module, class_name)
+            self._provider_classes[provider_name] = provider_class
+            return provider_class
         except (ImportError, AttributeError) as e:
             logger.error(f"Failed to load provider {provider_name}: {e}")
             return None
@@ -69,32 +70,7 @@ class MainLogic:
         Raises:
             Exception: If search operation fails
         """
-        results: List[SearchResult] = []
-        enabled_providers = [
-            name for name, enabled in self.config.providers.items() if enabled
-        ]
-
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future_to_provider = {}
-            for provider_name in enabled_providers:
-                provider_class = self.get_provider_class(provider_name)
-                if provider_class:
-                    provider = provider_class(self.config)
-                    future = executor.submit(provider.search_title, query)
-                    future_to_provider[future] = provider_name
-
-            for future in concurrent.futures.as_completed(future_to_provider):
-                provider_name = future_to_provider[future]
-                try:
-                    provider_results = future.result()
-                    results.extend(provider_results)
-                    logger.info(
-                        f"Received {len(provider_results)} results from {provider_name}"
-                    )
-                except Exception as e:
-                    logger.error(f"Error searching {provider_name}: {e}")
-
-        return results
+        return await self._search_providers(query, self._enabled_providers())
 
     async def process_item(self, item: Union[SearchResult, Series]) -> bool:
         """Process a search result or series item.
@@ -112,23 +88,38 @@ class MainLogic:
             raise ValueError(f"Unsupported item type: {type(item)}")
 
         try:
-            provider_class = self.get_provider_class(item.provider)
+            provider_name = getattr(item, "provider", None)
+            if not provider_name:
+                logger.error("Provider not found on item.")
+                return False
+
+            provider_class = self.get_provider_class(provider_name)
             if not provider_class:
-                logger.error(f"Provider not found for {item.provider}")
+                logger.error(f"Provider not found for {provider_name}")
                 return False
 
             provider = provider_class(self.config)
             if isinstance(item, SearchResult):
-                series = await provider.load_details_page(item.url)
-                if not series:
-                    logger.error(f"Failed to load details for {item.url}")
+                url = getattr(item, "url", None) or getattr(item, "link", None)
+                if not url:
+                    logger.error("Search result missing URL.")
                     return False
-                item = series
+                series = await asyncio.to_thread(provider.load_details_page, url)
+                if not series:
+                    logger.error(f"Failed to load details for {url}")
+                    return False
+                if isinstance(series, list):
+                    if not series:
+                        logger.error(f"No series details found for {url}")
+                        return False
+                    item = series[0]
+                else:
+                    item = series
 
             from .processors.covertor_manager import ConvertorManager
 
             convertor = ConvertorManager(self.config)
-            return await convertor.process(item)
+            return await asyncio.to_thread(convertor.process, item)
 
         except Exception as e:
             logger.error(f"Error processing item {item.title}: {e}")
@@ -138,35 +129,12 @@ class MainLogic:
         provider = provider_class(self.config)
         return provider.search_title(query)
 
-    def search_releases(self, query: str):
-        results = []
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future_to_provider = {}
-            for provider_name in [
-                name for name, enabled in self.config.providers.items() if enabled
-            ]:
-                provider_class = self.get_provider_class(provider_name)
-                if provider_class:
-                    future = executor.submit(self.search_titles, provider_class, query)
-                    future_to_provider[future] = provider_name
-                else:
-                    logger.error(f"Provider {provider_name} could not be loaded.")
+    async def search_releases(self, query: str):
+        return await self._search_providers(query, self._enabled_providers())
 
-            for future in concurrent.futures.as_completed(future_to_provider):
-                provider_name = future_to_provider[future]
-                try:
-                    provider_results = future.result()
-                    results.extend(provider_results)
-                    logger.info(f"Results from {provider_name} received.")
-                except Exception as exc:
-                    logger.error(f"{provider_name} generated an exception: {exc}")
-        return results
-
-    def search_releases_for_provider(self, provider_name: str, query: str):
-        provider_class = self.get_provider_class(provider_name)
-        if provider_class:
-            return self.search_titles(provider_class, query)
-        return []
+    async def search_releases_for_provider(self, provider_name: str, query: str):
+        provider_names = [provider_name]
+        return await self._search_providers(query, provider_names)
 
     def get_release_details(self, provider_name: str, release_url: str):
         provider_class = self.get_provider_class(provider_name)
@@ -177,14 +145,14 @@ class MainLogic:
 
     def get_details_for_all_releases(self, releases: List[Dict]):
         details = []
-        with concurrent.futures.ThreadPoolExecutor() as executor:
+        with ThreadPoolExecutor() as executor:
             future_to_details = {
                 executor.submit(
                     self.get_release_details, release["provider"], release["url"]
                 ): release
                 for release in releases
             }
-            for future in concurrent.futures.as_completed(future_to_details):
+            for future in as_completed(future_to_details):
                 release = future_to_details[future]
                 try:
                     details.append(future.result())
@@ -193,6 +161,33 @@ class MainLogic:
                         f"Error retrieving details for {release['url']}: {exc}"
                     )
         return details
+
+    def _enabled_providers(self) -> List[str]:
+        return [name for name, enabled in self.config.providers.items() if enabled]
+
+    async def _search_providers(
+        self, query: str, provider_names: Iterable[str]
+    ) -> List[SearchResult]:
+        tasks = [
+            asyncio.to_thread(self._search_provider, provider_name, query)
+            for provider_name in provider_names
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        combined: List[SearchResult] = []
+        for provider_name, result in zip(provider_names, results):
+            if isinstance(result, Exception):
+                logger.error(f"{provider_name} generated an exception: {result}")
+                continue
+            combined.extend(result)
+            logger.info(f"Results from {provider_name} received.")
+        return combined
+
+    def _search_provider(self, provider_name: str, query: str) -> List[SearchResult]:
+        provider_class = self.get_provider_class(provider_name)
+        if not provider_class:
+            logger.error(f"Provider {provider_name} could not be loaded.")
+            return []
+        return self.search_titles(provider_class, query)
 
 
 def add_release_by_url(config):
