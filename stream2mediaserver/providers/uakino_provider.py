@@ -94,7 +94,18 @@ class UakinoProvider(ProviderBase):
 
             timestamp = int(time.time())
             series_url = f"{self.base_url}/engine/ajax/playlists.php?news_id={news_id}&xfield=playlist&time={timestamp}"
-            return SearchManager.get_series_page(self.provider, series_url)
+            # Playlist endpoint expects same-origin XHR: Referer = series page, X-Requested-With
+            ajax_headers = {
+                **self.headers,
+                "Referer": query,
+                "X-Requested-With": "XMLHttpRequest",
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "Sec-Fetch-Dest": "empty",
+                "Sec-Fetch-Mode": "cors",
+            }
+            return SearchManager.get_series_page(
+                self.provider, series_url, headers=ajax_headers
+            )
         except Exception as e:
             logger.error(f"Error loading details for {query}: {str(e)}")
             return []

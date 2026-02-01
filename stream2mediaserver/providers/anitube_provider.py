@@ -80,8 +80,17 @@ class AnitubeProvider(ProviderBase):
                 return []
 
             series_url = f"{self.playlist_url_template}?news_id={news_id}&xfield=playlist&user_hash={dle_hash}"
+            # Playlist endpoint expects same-origin XHR: Referer = series page, X-Requested-With
+            ajax_headers = {
+                **self.headers,
+                "Referer": query,
+                "X-Requested-With": "XMLHttpRequest",
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "Sec-Fetch-Dest": "empty",
+                "Sec-Fetch-Mode": "cors",
+            }
             return SearchManager.get_series_page(
-                self.provider, series_url, headers=self.headers
+                self.provider, series_url, headers=ajax_headers
             )
 
         except Exception as e:

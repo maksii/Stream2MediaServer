@@ -47,16 +47,29 @@ class UaflixProvider(ProviderBase):
 
     def load_details_page(self, query):
         try:
-            # Extract ID from URL and fetch series details
+            # UAFlix uses slug URLs (e.g. /serials/rik-i-morti-anime/) — no numeric ID in URL
             news_id = SearchManager.extract_id_from_url(query)
+            if not news_id:
+                news_id = SearchManager.get_news_id_from_uaflix_slug_page(
+                    query, headers=self.headers
+                )
             if not news_id:
                 logger.error(f"Failed to extract ID from URL: {query}")
                 return []
 
             timestamp = int(time.time())
             series_url = f"{self.playlist_url_template}?news_id={news_id}&xfield=playlist&time={timestamp}"
+            # Playlist endpoint may expect same-origin XHR
+            ajax_headers = {
+                **self.headers,
+                "Referer": query,
+                "X-Requested-With": "XMLHttpRequest",
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "Sec-Fetch-Dest": "empty",
+                "Sec-Fetch-Mode": "cors",
+            }
             return SearchManager.get_series_page(
-                self.provider, series_url, headers=self.headers
+                self.provider, series_url, headers=ajax_headers
             )
 
         except Exception as e:

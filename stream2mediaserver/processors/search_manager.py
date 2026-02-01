@@ -276,6 +276,9 @@ class SearchManager:
                 return SearchManager._parse_uakino_series(response)
             elif provider == "anitube":
                 return SearchManager._parse_anitube_series(response)
+            elif provider == "uaflix":
+                # UAFlix uses same DLE playlists.php JSON shape as Anitube
+                return SearchManager._parse_anitube_series(response)
         except Exception as e:
             logger.error(f"Error parsing series page from {provider}: {str(e)}")
 
@@ -293,7 +296,7 @@ class SearchManager:
                         studio_id=li["data-id"],
                         studio_name=li["data-voice"],
                         series=li.text.strip(),
-                        video_url=f"https:{li['data-file']}",
+                        url=f"https:{li['data-file']}",
                     )
                 )
         return series_list
@@ -312,7 +315,7 @@ class SearchManager:
                     studio_id=studio_id,
                     studio_name=studio_name_li.text if studio_name_li else "Unknown",
                     series=item.text.strip(),
-                    video_url=item["data-file"],
+                    url=item["data-file"],
                 )
             )
         return series_list
@@ -320,6 +323,9 @@ class SearchManager:
     @staticmethod
     def extract_id_from_url(url: str) -> Optional[str]:
         """Extract content ID from URL.
+
+        Supports DLE-style URLs: /123-title.html or /123-title (numeric prefix).
+        Does not match slug-only URLs (e.g. /serials/slug-name/).
 
         Args:
             url: Content URL
@@ -330,4 +336,33 @@ class SearchManager:
         match = re.search(r"/(\d+)-|/(\d+)\.html", url)
         if match:
             return match.group(1) if match.group(1) else match.group(2)
+        return None
+
+    @staticmethod
+    def get_news_id_from_uaflix_slug_page(url: str, headers: Optional[dict] = None) -> Optional[str]:
+        """Fetch a UAFlix slug URL (e.g. /serials/rik-i-morti-anime/) and extract news_id.
+
+        DLE pages often embed news_id in scripts or links (playlists.php?news_id=...).
+
+        Args:
+            url: Full series page URL (slug-based)
+            headers: Optional request headers
+
+        Returns:
+            news_id string if found in page, None otherwise
+        """
+        response = RequestManager.get(url, headers=headers)
+        if not response or not response.ok:
+            return None
+        text = response.text
+        # playlists.php?news_id=123 or news_id=123 in scripts/links
+        match = re.search(r"playlists\.php\?[^\"'\s]*news_id=(\d+)", text)
+        if match:
+            return match.group(1)
+        match = re.search(r"news_id['\"]?\s*[=:]\s*['\"]?(\d+)", text)
+        if match:
+            return match.group(1)
+        match = re.search(r"newsid['\"]?\s*[=:]\s*['\"]?(\d+)", text, re.I)
+        if match:
+            return match.group(1)
         return None
