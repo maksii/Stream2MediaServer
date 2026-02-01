@@ -1,8 +1,8 @@
 """UAFlix provider implementation."""
 
-import time
 from ..processors.covertor_manager import ConvertorManager
 from ..processors.m3u8_manager import M3U8Manager
+from ..processors.request_manager import RequestManager
 from ..processors.search_manager import SearchManager
 from ..providers.provider_base import ProviderBase
 from ..utils.logger import logger
@@ -47,31 +47,16 @@ class UaflixProvider(ProviderBase):
 
     def load_details_page(self, query):
         try:
-            # UAFlix uses slug URLs (e.g. /serials/rik-i-morti-anime/) — no numeric ID in URL
-            news_id = SearchManager.extract_id_from_url(query)
-            if not news_id:
-                news_id = SearchManager.get_news_id_from_uaflix_slug_page(
-                    query, headers=self.headers
-                )
-            if not news_id:
-                logger.error(f"Failed to extract ID from URL: {query}")
+            # UAFlix series page (e.g. /serials/rik-i-morti-anime/) shows show details and
+            # episode list under frels2 / #sers-wr; the player is only on each episode page.
+            # Fetch the series page HTML and parse episodes (url = episode page, not playlist).
+            response = RequestManager.get(query, headers=self.headers)
+            if not response or not response.ok:
+                logger.error(f"Failed to get series page: {query}")
                 return []
-
-            timestamp = int(time.time())
-            series_url = f"{self.playlist_url_template}?news_id={news_id}&xfield=playlist&time={timestamp}"
-            # Playlist endpoint may expect same-origin XHR
-            ajax_headers = {
-                **self.headers,
-                "Referer": query,
-                "X-Requested-With": "XMLHttpRequest",
-                "Accept": "application/json, text/javascript, */*; q=0.01",
-                "Sec-Fetch-Dest": "empty",
-                "Sec-Fetch-Mode": "cors",
-            }
-            return SearchManager.get_series_page(
-                self.provider, series_url, headers=ajax_headers
+            return SearchManager.parse_uaflix_series_page_html(
+                response, base_url=self.base_url
             )
-
         except Exception as e:
             logger.error(f"Error loading details for {query}: {str(e)}")
             return []

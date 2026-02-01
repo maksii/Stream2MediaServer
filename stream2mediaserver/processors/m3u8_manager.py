@@ -35,8 +35,13 @@ class M3U8Manager:
         return highest_quality_playlist
 
     @staticmethod
-    def get_master_playlist(series_url):
-        response = RequestManager.get(series_url)
+    def get_master_playlist(series_url, headers=None):
+        """Fetch page at series_url and extract embedded m3u8 URL.
+
+        For UAFlix (and others), series_url is an episode page; optional headers
+        (e.g. Referer) can be passed to avoid 403 when fetching the page.
+        """
+        response = RequestManager.get(series_url, headers=headers)
         if response and response.ok:
             match = re.search(r'file:"(https[^"]+\.m3u8)"', response.text)
             if match:

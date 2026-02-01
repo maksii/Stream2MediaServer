@@ -3,7 +3,7 @@
 import html
 import re
 from typing import List, Optional
-from urllib.parse import quote, unquote, urlparse, urlunparse
+from urllib.parse import quote, unquote, urljoin, urlparse, urlunparse
 
 from bs4 import BeautifulSoup
 
@@ -273,19 +273,17 @@ class SearchManager:
 
         try:
             if provider == "uakino":
-                return SearchManager._parse_uakino_series(response)
+                return SearchManager._parse_uakino_series(response, provider=provider)
             elif provider == "anitube":
-                return SearchManager._parse_anitube_series(response)
-            elif provider == "uaflix":
-                # UAFlix uses same DLE playlists.php JSON shape as Anitube
-                return SearchManager._parse_anitube_series(response)
+                return SearchManager._parse_anitube_series(response, provider=provider)
+            # UAFlix does not use playlists.php; use parse_uaflix_series_page_html on series page HTML
         except Exception as e:
             logger.error(f"Error parsing series page from {provider}: {str(e)}")
 
         return []
 
     @staticmethod
-    def _parse_uakino_series(response) -> List[Series]:
+    def _parse_uakino_series(response, provider: str = "uakino") -> List[Series]:
         """Parse series information from UAKino response."""
         series_list = []
         soup = BeautifulSoup(response.json()["response"], "html.parser")
@@ -297,12 +295,13 @@ class SearchManager:
                         studio_name=li["data-voice"],
                         series=li.text.strip(),
                         url=f"https:{li['data-file']}",
+                        provider=provider,
                     )
                 )
         return series_list
 
     @staticmethod
-    def _parse_anitube_series(response) -> List[Series]:
+    def _parse_anitube_series(response, provider: str = "anitube") -> List[Series]:
         """Parse series information from Anitube response."""
         series_list = []
         soup = BeautifulSoup(response.json()["response"], "html.parser")
@@ -316,6 +315,7 @@ class SearchManager:
                     studio_name=studio_name_li.text if studio_name_li else "Unknown",
                     series=item.text.strip(),
                     url=item["data-file"],
+                    provider=provider,
                 )
             )
         return series_list
@@ -337,6 +337,60 @@ class SearchManager:
         if match:
             return match.group(1) if match.group(1) else match.group(2)
         return None
+
+    @staticmethod
+    def parse_uaflix_series_page_html(
+        response, base_url: str = "https://uafix.net"
+    ) -> List[Series]:
+        """Parse UAFlix series page HTML: episodes are listed under frels2 / #sers-wr.
+
+        UAFlix does not embed a player on the series page; each episode link points to
+        an episode page where the player is. We return Series with url = episode page URL.
+
+        Args:
+            response: requests.Response with HTML body
+            base_url: Base URL for resolving relative hrefs
+
+        Returns:
+            List of Series (url = episode page, series = episode title)
+        """
+        series_list: List[Series] = []
+        if not response or not response.ok:
+            return series_list
+        soup = BeautifulSoup(response.text, "html.parser")
+        sers_wr = soup.find("div", id="sers-wr")
+        if not sers_wr:
+            sers_wr = soup.find("div", class_="frels2")
+        if not sers_wr:
+            return series_list
+        for idx, item in enumerate(
+            sers_wr.find_all("div", class_="video-item")
+        ):
+            link = item.find("a", class_=lambda c: c and "vi-img" in c)
+            if not link or not link.get("href"):
+                continue
+            href = unquote(link.get("href", "").strip())
+            if not href or "season" not in href.lower() or "episode" not in href.lower():
+                continue
+            episode_url = href if href.startswith("http") else urljoin(base_url, href)
+            vi_title = item.find("div", class_="vi-title")
+            vi_rate = item.find("div", class_="vi-rate")
+            title_parts = []
+            if vi_title:
+                title_parts.append(SearchManager.clean_text(vi_title.get_text()))
+            if vi_rate:
+                title_parts.append(SearchManager.clean_text(vi_rate.get_text()))
+            title = " ".join(title_parts) if title_parts else f"Episode {idx + 1}"
+            series_list.append(
+                Series(
+                    studio_id=f"ep_{idx}",
+                    studio_name="UAFlix",
+                    series=title,
+                    url=episode_url,
+                    provider="uaflix",
+                )
+            )
+        return series_list
 
     @staticmethod
     def get_news_id_from_uaflix_slug_page(url: str, headers: Optional[dict] = None) -> Optional[str]:

@@ -15,11 +15,12 @@ class FakeResponse:
 
 
 class FakeSeries:
-    def __init__(self, studio_id, studio_name, series, video_url):
+    def __init__(self, studio_id, studio_name, series, url, provider=None):
         self.studio_id = studio_id
         self.studio_name = studio_name
         self.series = series
-        self.url = video_url
+        self.url = url
+        self.provider = provider
 
 
 class SearchManagerUnitTests(unittest.TestCase):
