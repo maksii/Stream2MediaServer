@@ -8,7 +8,7 @@ from urllib.parse import quote, unquote, urljoin, urlparse, urlunparse
 from bs4 import BeautifulSoup
 
 from ..models.search_result import SearchResult
-from ..models.series import Series
+from ..models.series import Series, SeriesGroup, group_series_by_studio
 from ..utils.logger import logger
 from .request_manager import RequestManager
 
@@ -270,8 +270,8 @@ class SearchManager:
     @staticmethod
     def get_series_page(
         provider: str, series_url: str, headers: Optional[dict] = None
-    ) -> List[Series]:
-        """Get series information from a provider's page.
+    ) -> List[SeriesGroup]:
+        """Get series information from a provider's page, grouped by studio.
 
         Args:
             provider: Provider identifier
@@ -279,7 +279,7 @@ class SearchManager:
             headers: Optional request headers
 
         Returns:
-            List of series objects
+            List of SeriesGroup (studio + episodes)
         """
         response = RequestManager.get(series_url, headers=headers)
         if not response or not response.ok:
@@ -288,9 +288,11 @@ class SearchManager:
 
         try:
             if provider == "uakino":
-                return SearchManager._parse_uakino_series(response, provider=provider)
+                flat = SearchManager._parse_uakino_series(response, provider=provider)
+                return group_series_by_studio(flat)
             elif provider == "anitube":
-                return SearchManager._parse_anitube_series(response, provider=provider)
+                flat = SearchManager._parse_anitube_series(response, provider=provider)
+                return group_series_by_studio(flat)
             # UAFlix does not use playlists.php; use parse_uaflix_series_page_html on series page HTML
         except Exception as e:
             logger.error(f"Error parsing series page from {provider}: {str(e)}")
@@ -396,11 +398,27 @@ class SearchManager:
             if vi_rate:
                 title_parts.append(SearchManager.clean_text(vi_rate.get_text()))
             title = " ".join(title_parts) if title_parts else f"Episode {idx + 1}"
+            # Group by season: "Сезон 3 Серія 1 Execution" -> studio "UAFlix Сезон 3", series "Серія 1 Execution"
+            season_match = re.match(
+                r"^\s*(?:Сезон|Season)\s+(\d+)\s+(.*)$",
+                title,
+                re.IGNORECASE | re.DOTALL,
+            )
+            if season_match:
+                season_num = season_match.group(1)
+                episode_label = season_match.group(2).strip()
+                studio_id = f"season_{season_num}"
+                studio_name = f"UAFlix Сезон {season_num}"
+                series_label = episode_label if episode_label else title
+            else:
+                studio_id = f"ep_{idx}"
+                studio_name = "UAFlix"
+                series_label = title
             series_list.append(
                 Series(
-                    studio_id=f"ep_{idx}",
-                    studio_name="UAFlix",
-                    series=title,
+                    studio_id=studio_id,
+                    studio_name=studio_name,
+                    series=series_label,
                     url=episode_url,
                     provider="uaflix",
                 )

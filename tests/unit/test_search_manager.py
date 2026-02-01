@@ -48,15 +48,16 @@ class SearchManagerUnitTests(unittest.TestCase):
         )
         mock_get.return_value = FakeResponse(json_data={"response": html_payload})
 
-        series_list = SearchManager.get_series_page(
+        groups = SearchManager.get_series_page(
             "uakino", "https://uakino.me/series"
         )
 
-        self.assertEqual(len(series_list), 1)
-        self.assertEqual(series_list[0].studio_id, "1")
-        self.assertEqual(series_list[0].studio_name, "Studio A")
-        self.assertEqual(series_list[0].series, "Episode 1")
-        self.assertEqual(series_list[0].url, "https://video.mp4")
+        self.assertEqual(len(groups), 1)
+        self.assertEqual(groups[0].studio_id, "1")
+        self.assertEqual(groups[0].studio_name, "Studio A")
+        self.assertEqual(len(groups[0].episodes), 1)
+        self.assertEqual(groups[0].episodes[0].series, "Episode 1")
+        self.assertEqual(groups[0].episodes[0].url, "https://video.mp4")
 
     @patch("stream2mediaserver.processors.search_manager.Series", FakeSeries)
     @patch("stream2mediaserver.processors.search_manager.RequestManager.get")
@@ -67,15 +68,16 @@ class SearchManagerUnitTests(unittest.TestCase):
         )
         mock_get.return_value = FakeResponse(json_data={"response": html_payload})
 
-        series_list = SearchManager.get_series_page(
+        groups = SearchManager.get_series_page(
             "anitube", "https://anitube.in.ua/series"
         )
 
-        self.assertEqual(len(series_list), 1)
-        self.assertEqual(series_list[0].studio_id, "base_1")
-        self.assertEqual(series_list[0].studio_name, "Studio Base")
-        self.assertEqual(series_list[0].series, "Episode 1")
-        self.assertEqual(series_list[0].url, "http://video.mp4")
+        self.assertEqual(len(groups), 1)
+        self.assertEqual(groups[0].studio_id, "base_1")
+        self.assertEqual(groups[0].studio_name, "Studio Base")
+        self.assertEqual(len(groups[0].episodes), 1)
+        self.assertEqual(groups[0].episodes[0].series, "Episode 1")
+        self.assertEqual(groups[0].episodes[0].url, "http://video.mp4")
 
 
 if __name__ == "__main__":

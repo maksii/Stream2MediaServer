@@ -7,7 +7,7 @@ from typing import Dict, Iterable, List, Optional, Type, Union
 
 from .config import AppConfig, config as default_config
 from .models.search_result import SearchResult
-from .models.series import Series
+from .models.series import Series, SeriesGroup
 from .providers.provider_base import ProviderBase
 from .utils.logger import logger
 
@@ -112,7 +112,14 @@ class MainLogic:
                     if not series:
                         logger.error(f"No series details found for {url}")
                         return False
-                    item = series[0]
+                    first = series[0]
+                    if isinstance(first, SeriesGroup) and first.episodes:
+                        item = first.episodes[0]
+                    elif isinstance(first, SeriesGroup):
+                        logger.error(f"No episodes in first group for {url}")
+                        return False
+                    else:
+                        item = first
                 else:
                     item = series
 

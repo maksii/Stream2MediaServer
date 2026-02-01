@@ -1,5 +1,6 @@
 """UAFlix provider implementation."""
 
+from ..models.series import group_series_by_studio
 from ..processors.covertor_manager import ConvertorManager
 from ..processors.m3u8_manager import M3U8Manager
 from ..processors.request_manager import RequestManager
@@ -54,9 +55,10 @@ class UaflixProvider(ProviderBase):
             if not response or not response.ok:
                 logger.error(f"Failed to get series page: {query}")
                 return []
-            return SearchManager.parse_uaflix_series_page_html(
+            flat = SearchManager.parse_uaflix_series_page_html(
                 response, base_url=self.base_url
             )
+            return group_series_by_studio(flat)
         except Exception as e:
             logger.error(f"Error loading details for {query}: {str(e)}")
             return []

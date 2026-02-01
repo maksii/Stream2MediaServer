@@ -6,7 +6,7 @@ from urllib.parse import urljoin
 
 from ..config import AppConfig
 from ..models.search_result import SearchResult
-from ..models.series import Series
+from ..models.series import Series, SeriesGroup
 
 
 class ProviderBase(ABC):
@@ -89,14 +89,14 @@ class ProviderBase(ABC):
         raise NotImplementedError("Providers must implement search_title")
 
     @abstractmethod
-    def load_details_page(self, url: str) -> Optional[Series]:
-        """Load detailed information about a series.
+    def load_details_page(self, url: str) -> Optional[List[SeriesGroup]]:
+        """Load detailed information about a series, grouped by studio (dubbing).
 
         Args:
             url: URL of the series details page
 
         Returns:
-            Series object if successful, None otherwise
+            List of SeriesGroup (studio + episodes) if successful, None or empty list otherwise
 
         Raises:
             NotImplementedError: If the provider hasn't implemented this method
