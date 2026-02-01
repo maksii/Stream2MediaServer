@@ -10,15 +10,11 @@ def read_version() -> str:
             return line.split("=", 1)[1].strip().strip('"').strip("'")
     raise RuntimeError("Unable to determine package version.")
 
+
 setup(
     name="stream2mediaserver",
     version=read_version(),
     description="Prototype for locating TV series/anime streams",
     packages=find_packages(),
-    install_requires=[
-        'requests',
-        'beautifulsoup4',
-        'm3u8',
-        'py3createtorrent'
-    ]
+    install_requires=["requests", "beautifulsoup4", "m3u8", "py3createtorrent"],
 )

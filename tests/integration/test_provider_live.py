@@ -14,7 +14,9 @@ class ProviderLiveIntegrationTests(unittest.TestCase):
         provider = provider_cls(AppConfig())
         response = RequestManager.get(provider.base_url, headers=provider.headers)
         if not response or not response.ok:
-            self.skipTest("Provider base URL not reachable; skipping live integration test.")
+            self.skipTest(
+                "Provider base URL not reachable; skipping live integration test."
+            )
 
         results = SearchManager.search_movies(
             provider.provider,
@@ -24,7 +26,9 @@ class ProviderLiveIntegrationTests(unittest.TestCase):
             headers=provider.headers,
         )
         if not results:
-            self.skipTest("No results returned; provider may have changed or blocked the request.")
+            self.skipTest(
+                "No results returned; provider may have changed or blocked the request."
+            )
 
         self.assertTrue(results[0].title)
         self.assertTrue(results[0].link)

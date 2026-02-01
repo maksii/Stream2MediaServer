@@ -20,8 +20,9 @@ PROVIDER_MAPPING: Dict[str, str] = {
     "animeon_provider": "AnimeonProvider",
     "anitube_provider": "AnitubeProvider",
     "uakino_provider": "UakinoProvider",
-    "uaflix_provider": "UaflixProvider"
+    "uaflix_provider": "UaflixProvider",
 }
+
 
 class MainLogic:
     """Main logic class for handling media content operations."""
@@ -69,7 +70,9 @@ class MainLogic:
             Exception: If search operation fails
         """
         results: List[SearchResult] = []
-        enabled_providers = [name for name, enabled in self.config.providers.items() if enabled]
+        enabled_providers = [
+            name for name, enabled in self.config.providers.items() if enabled
+        ]
 
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future_to_provider = {}
@@ -85,7 +88,9 @@ class MainLogic:
                 try:
                     provider_results = future.result()
                     results.extend(provider_results)
-                    logger.info(f"Received {len(provider_results)} results from {provider_name}")
+                    logger.info(
+                        f"Received {len(provider_results)} results from {provider_name}"
+                    )
                 except Exception as e:
                     logger.error(f"Error searching {provider_name}: {e}")
 
@@ -121,6 +126,7 @@ class MainLogic:
                 item = series
 
             from .processors.covertor_manager import ConvertorManager
+
             convertor = ConvertorManager(self.config)
             return await convertor.process(item)
 
@@ -136,7 +142,9 @@ class MainLogic:
         results = []
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future_to_provider = {}
-            for provider_name in [name for name, enabled in self.config.providers.items() if enabled]:
+            for provider_name in [
+                name for name, enabled in self.config.providers.items() if enabled
+            ]:
                 provider_class = self.get_provider_class(provider_name)
                 if provider_class:
                     future = executor.submit(self.search_titles, provider_class, query)
@@ -171,7 +179,9 @@ class MainLogic:
         details = []
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future_to_details = {
-                executor.submit(self.get_release_details, release['provider'], release['url']): release 
+                executor.submit(
+                    self.get_release_details, release["provider"], release["url"]
+                ): release
                 for release in releases
             }
             for future in concurrent.futures.as_completed(future_to_details):
@@ -179,20 +189,27 @@ class MainLogic:
                 try:
                     details.append(future.result())
                 except Exception as exc:
-                    logger.error(f"Error retrieving details for {release['url']}: {exc}")
+                    logger.error(
+                        f"Error retrieving details for {release['url']}: {exc}"
+                    )
         return details
+
 
 def add_release_by_url(config):
     pass
 
+
 def add_release_by_name(config):
     pass
-    
+
+
 def update_release_by_name(config):
     pass
-    
+
+
 def update_releases(config):
     pass
+
 
 def update_release(config):
     pass

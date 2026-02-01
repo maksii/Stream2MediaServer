@@ -13,7 +13,13 @@ class FakeProvider:
         self.config = config
 
     def search_title(self, query):
-        result = SearchResult(link="http://example.com/item", image_url="", title="Test", title_eng="", provider="fake")
+        result = SearchResult(
+            link="http://example.com/item",
+            image_url="",
+            title="Test",
+            title_eng="",
+            provider="fake",
+        )
         result.url = result.link
         return [result]
 
@@ -43,11 +49,22 @@ class MainLogicUnitTests(unittest.IsolatedAsyncioTestCase):
     async def test_process_item_with_search_result_loads_details(self):
         config = AppConfig(providers={"fake_provider": True})
         logic = MainLogic(config)
-        item = SearchResult(link="http://example.com/item", image_url="", title="Test", title_eng="", provider="fake_provider")
+        item = SearchResult(
+            link="http://example.com/item",
+            image_url="",
+            title="Test",
+            title_eng="",
+            provider="fake_provider",
+        )
         item.url = item.link
 
-        with patch.object(MainLogic, "get_provider_class", return_value=FakeProvider), \
-            patch("stream2mediaserver.processors.covertor_manager.ConvertorManager", FakeConvertor):
+        with (
+            patch.object(MainLogic, "get_provider_class", return_value=FakeProvider),
+            patch(
+                "stream2mediaserver.processors.covertor_manager.ConvertorManager",
+                FakeConvertor,
+            ),
+        ):
             result = await logic.process_item(item)
 
         self.assertTrue(result)
@@ -55,12 +72,22 @@ class MainLogicUnitTests(unittest.IsolatedAsyncioTestCase):
     async def test_process_item_with_series_skips_details_lookup(self):
         config = AppConfig(providers={"fake_provider": True})
         logic = MainLogic(config)
-        series = Series(studio_id="1", studio_name="Studio", series="Episode 1", url="http://example.com")
+        series = Series(
+            studio_id="1",
+            studio_name="Studio",
+            series="Episode 1",
+            url="http://example.com",
+        )
         series.provider = "fake_provider"
         series.title = "Episode 1"
 
-        with patch.object(MainLogic, "get_provider_class", return_value=FakeProvider), \
-            patch("stream2mediaserver.processors.covertor_manager.ConvertorManager", FakeConvertor):
+        with (
+            patch.object(MainLogic, "get_provider_class", return_value=FakeProvider),
+            patch(
+                "stream2mediaserver.processors.covertor_manager.ConvertorManager",
+                FakeConvertor,
+            ),
+        ):
             result = await logic.process_item(series)
 
         self.assertTrue(result)

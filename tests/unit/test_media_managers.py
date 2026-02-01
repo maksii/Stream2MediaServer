@@ -9,8 +9,12 @@ class MediaManagerUnitTests(unittest.TestCase):
     def test_get_best_quality_playlist_selects_highest_bandwidth(self):
         playlists = [
             SimpleNamespace(stream_info=SimpleNamespace(bandwidth=500), uri="low.m3u8"),
-            SimpleNamespace(stream_info=SimpleNamespace(bandwidth=1500), uri="high.m3u8"),
-            SimpleNamespace(stream_info=SimpleNamespace(bandwidth=1000), uri="mid.m3u8"),
+            SimpleNamespace(
+                stream_info=SimpleNamespace(bandwidth=1500), uri="high.m3u8"
+            ),
+            SimpleNamespace(
+                stream_info=SimpleNamespace(bandwidth=1000), uri="mid.m3u8"
+            ),
         ]
         master = SimpleNamespace(playlists=playlists)
 
