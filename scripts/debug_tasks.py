@@ -1,14 +1,37 @@
 import argparse
 import asyncio
+from pathlib import Path
 
 from stream2mediaserver.main_logic import MainLogic
 from stream2mediaserver.parser import animeon_parser
+from stream2mediaserver.utils.test_data_logger import TestDataLogger
 
 
 def run_search(query: str) -> None:
     logic = MainLogic()
     results = asyncio.run(logic.search(query))
     print(f"Found {len(results)} results for '{query}'.")
+
+
+def run_populate_test_data(query: str, dump_dir: Path) -> None:
+    logic = MainLogic()
+    TestDataLogger.configure(base_dir=dump_dir, enabled=True)
+    for provider_name in logic.enabled_provider_names():
+        provider_class = logic.get_provider_class(provider_name)
+        if not provider_class:
+            continue
+        provider = provider_class(logic.config)
+        provider_label = getattr(provider, "provider", provider_name)
+        with TestDataLogger.context(provider_label, "searchAnime", "searchtitle"):
+            results = provider.search_title(query)
+        if not results:
+            continue
+        first = results[0]
+        url = getattr(first, "url", None) or getattr(first, "link", None)
+        if not url:
+            continue
+        with TestDataLogger.context(provider_label, "searchAnime", "detailspage"):
+            provider.load_details_page(url)
 
 
 def run_initiate_scrap(database: str) -> None:
@@ -29,12 +52,19 @@ def run_delta(database: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Debug helpers for Stream2MediaServer")
-    parser.add_argument("action", choices=["search", "initiate_scrap", "delta"])
     parser.add_argument(
-        "--query", default="Naruto", help="Search query for main_logic search"
+        "action", choices=["search", "initiate_scrap", "delta", "populate_test_data"]
+    )
+    parser.add_argument(
+        "--query", default="Example Anime", help="Search query for main_logic search"
     )
     parser.add_argument(
         "--db", default="data/animeon.sqlite", help="SQLite database path"
+    )
+    parser.add_argument(
+        "--dump-dir",
+        default="data/test_data",
+        help="Directory for captured provider responses",
     )
     args = parser.parse_args()
 
@@ -44,6 +74,10 @@ def main() -> None:
 
     if args.action == "initiate_scrap":
         run_initiate_scrap(args.db)
+        return
+
+    if args.action == "populate_test_data":
+        run_populate_test_data(args.query, Path(args.dump_dir))
         return
 
     run_delta(args.db)
