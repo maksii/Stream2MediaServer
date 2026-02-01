@@ -22,6 +22,9 @@ def run_search(query: str) -> None:
 def run_populate_test_data(query: str, dump_dir: Path) -> None:
     logic = MainLogic()
     TestDataLogger.configure(base_dir=dump_dir, enabled=True)
+    print(f"Query: {query!r}")
+    print(f"Dump dir: {dump_dir}")
+    print("-" * 60)
     for provider_name in logic.enabled_provider_names():
         provider_class = logic.get_provider_class(provider_name)
         if not provider_class:
@@ -30,6 +33,19 @@ def run_populate_test_data(query: str, dump_dir: Path) -> None:
         provider_label = getattr(provider, "provider", provider_name)
         with TestDataLogger.context(provider_label, "searchAnime", "searchtitle"):
             results = provider.search_title(query)
+        # Always print provider and results (even if empty)
+        print(f"\n[{provider_label}]")
+        print(f"  Found: {len(results)} result(s)")
+        for i, r in enumerate(results, 1):
+            title = getattr(r, "title", "") or ""
+            title_eng = getattr(r, "title_eng", "") or ""
+            link = getattr(r, "link", "") or getattr(r, "url", "") or ""
+            line = f"  {i}. {title!s}"
+            if title_eng and str(title_eng) != "Not Specified":
+                line += f" / {title_eng!s}"
+            print(line)
+            if link:
+                print(f"     {link}")
         if not results:
             continue
         first = results[0]
@@ -38,6 +54,7 @@ def run_populate_test_data(query: str, dump_dir: Path) -> None:
             continue
         with TestDataLogger.context(provider_label, "searchAnime", "detailspage"):
             provider.load_details_page(url)
+    print()
 
 
 def run_initiate_scrap(database: str) -> None:

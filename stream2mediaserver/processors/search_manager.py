@@ -92,7 +92,7 @@ class SearchManager:
         try:
             if provider == "uakino":
                 results = SearchManager._search_uakino(
-                    encoded_query, dle_hash, search_url, headers
+                    encoded_query, dle_hash, search_url, headers, base_url
                 )
             elif provider == "anitube":
                 results = SearchManager._search_anitube(
@@ -114,10 +114,25 @@ class SearchManager:
 
     @staticmethod
     def _search_uakino(
-        query: str, dle_hash: str, search_url: str, headers: Optional[dict]
+        query: str,
+        dle_hash: str,
+        search_url: str,
+        headers: Optional[dict],
+        base_url: str,
     ) -> List[SearchResult]:
-        """Search implementation for UAKino provider."""
-        form_data = {"story": query, "dle_hash": dle_hash, "thisUrl": "/"}
+        """Search implementation for UAKino provider.
+
+        Search POSTs to ajax.php with story, dle_hash, thisUrl (referrer path).
+        Response is JSON with "content" = HTML fragment; each result is a.search-result-link.
+        """
+        parsed_base = urlparse(base_url)
+        scheme, netloc = parsed_base.scheme or "https", parsed_base.netloc
+        # story must be raw query so requests encodes as application/x-www-form-urlencoded (e.g. space -> +)
+        form_data = {
+            "story": unquote(query),
+            "dle_hash": dle_hash,
+            "thisUrl": "/index.php",
+        }
         response = RequestManager.post(search_url, data=form_data, headers=headers)
         results = []
         if response and response.ok:
@@ -129,7 +144,7 @@ class SearchManager:
                     parsed_url = urlparse(poster)
                     if not parsed_url.netloc:
                         new_url = urlunparse(
-                            parsed_url._replace(scheme="https", netloc="uakino.me")
+                            parsed_url._replace(scheme=scheme, netloc=netloc)
                         )
                         poster = new_url
                 name = link.find("span", class_="searchheading")

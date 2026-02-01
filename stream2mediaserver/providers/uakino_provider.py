@@ -14,7 +14,7 @@ class UakinoProvider(ProviderBase):
         super().__init__(config)
         self.provider = "uakino"
         self.provider_type = "dle"
-        self.base_url = "https://uakino.me"
+        self.base_url = "https://uakino.best"
         self.search_url = f"{self.base_url}/engine/lazydev/dle_search/ajax.php"
         self.playlist_url_template = f"{self.base_url}/engine/ajax/playlists.php"
 
@@ -38,26 +38,31 @@ class UakinoProvider(ProviderBase):
                 logger.error(f"Failed to access main page: {main_page.status_code}")
                 return []
 
-            # Extract DLE hash from the main page
+            # Extract DLE hash from the main page (ajax search expects dle_hash in form)
             soup = BeautifulSoup(main_page.text, "html.parser")
-            script_text = soup.find("script", string=re.compile(r"var dle_login_hash"))
             dle_hash = None
-
-            if script_text:
-                match = re.search(r"var dle_login_hash = '(\w+)';", script_text.string)
-                if match:
-                    dle_hash = match.group(1)
+            for var_name in ("dle_login_hash", "dle_hash"):
+                script_text = soup.find("script", string=re.compile(re.escape(var_name)))
+                if script_text and script_text.string:
+                    match = re.search(
+                        rf"var {re.escape(var_name)}\s*=\s*['\"](\w+)['\"]",
+                        script_text.string,
+                    )
+                    if match:
+                        dle_hash = match.group(1)
+                        break
 
             if not dle_hash:
                 logger.warning(f"Failed to retrieve dle_login_hash for query: {query}")
                 return []
 
-            # Prepare search request with proper headers and cookies
+            # Prepare search request with proper headers and cookies (match browser: referrer = search page)
             search_headers = self.headers.copy()
             search_headers.update(
                 {
                     "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
                     "X-Requested-With": "XMLHttpRequest",
+                    "Referer": f"{self.base_url}/index.php?do=search",
                     "Cookie": f"dle_hash={dle_hash}; {'; '.join(f'{k}={v}' for k, v in session.cookies.items())}",
                 }
             )
