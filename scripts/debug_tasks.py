@@ -1,6 +1,12 @@
 import argparse
 import asyncio
+import sys
 from pathlib import Path
+
+# Ensure project root is on path when running script directly (e.g. debugger)
+_root = Path(__file__).resolve().parent.parent
+if str(_root) not in sys.path:
+    sys.path.insert(0, str(_root))
 
 from stream2mediaserver.main_logic import MainLogic
 from stream2mediaserver.parser import animeon_parser

@@ -24,7 +24,13 @@ class ProviderConfig:
 
     timeout: int = 30
     max_retries: int = 3
-    user_agent: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    # Chrome-like User-Agent for better compatibility with Cloudflare-protected sites
+    user_agent: str = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+    )
+    # Minimum seconds to wait between requests to the same host (throttle Cloudflare)
+    request_delay_seconds: float = 2.0
 
 
 def default_providers() -> Dict[str, bool]:

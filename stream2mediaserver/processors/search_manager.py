@@ -222,7 +222,7 @@ class SearchManager:
         query: str, search_url: str, headers: Optional[dict]
     ) -> List[SearchResult]:
         """Search implementation for Animeon provider."""
-        url = f"{search_url}/{query}?full=false"
+        url = f"{search_url}?text={query}"
         response = RequestManager.get(url, headers=headers)
         results = []
         if response and response.ok:
@@ -253,17 +253,20 @@ class SearchManager:
         return results
 
     @staticmethod
-    def get_series_page(provider: str, series_url: str) -> List[Series]:
+    def get_series_page(
+        provider: str, series_url: str, headers: Optional[dict] = None
+    ) -> List[Series]:
         """Get series information from a provider's page.
 
         Args:
             provider: Provider identifier
             series_url: URL of the series page
+            headers: Optional request headers
 
         Returns:
             List of series objects
         """
-        response = RequestManager.get(series_url)
+        response = RequestManager.get(series_url, headers=headers)
         if not response or not response.ok:
             logger.error(f"Failed to get series page from {provider}")
             return []
