@@ -6,6 +6,7 @@ import requests
 
 from ..config import config
 from ..utils.logger import logger
+from ..utils.test_data_logger import TestDataLogger
 
 
 class RequestManager:
@@ -45,8 +46,10 @@ class RequestManager:
                 timeout=cls.DEFAULT_TIMEOUT,
             )
             response.raise_for_status()
+            TestDataLogger.log_response(response)
             return response
         except requests.RequestException as e:
+            TestDataLogger.log_response(getattr(e, "response", None), error=str(e))
             logger.error(f"GET request failed for {url}: {str(e)}")
             return None
 
@@ -73,7 +76,9 @@ class RequestManager:
                 timeout=cls.DEFAULT_TIMEOUT,
             )
             response.raise_for_status()
+            TestDataLogger.log_response(response)
             return response
         except requests.RequestException as e:
+            TestDataLogger.log_response(getattr(e, "response", None), error=str(e))
             logger.error(f"POST request failed for {url}: {str(e)}")
             return None

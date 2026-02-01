@@ -24,6 +24,14 @@
       "program": "${workspaceFolder}/scripts/debug_tasks.py",
       "args": ["delta", "--db", "data/animeon.sqlite"],
       "console": "integratedTerminal"
+    },
+    {
+      "name": "Providers: Populate Test Data",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/debug_tasks.py",
+      "args": ["populate_test_data", "--query", "Example Anime"],
+      "console": "integratedTerminal"
     }
   ]
 }

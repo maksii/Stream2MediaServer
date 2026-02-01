@@ -165,6 +165,9 @@ class MainLogic:
     def _enabled_providers(self) -> List[str]:
         return [name for name, enabled in self.config.providers.items() if enabled]
 
+    def enabled_provider_names(self) -> List[str]:
+        return self._enabled_providers()
+
     async def _search_providers(
         self, query: str, provider_names: Iterable[str]
     ) -> List[SearchResult]:
