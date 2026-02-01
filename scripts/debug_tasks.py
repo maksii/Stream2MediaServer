@@ -9,9 +9,9 @@ _root = Path(__file__).resolve().parent.parent
 if str(_root) not in sys.path:
     sys.path.insert(0, str(_root))
 
-from stream2mediaserver.main_logic import MainLogic
-from stream2mediaserver.parser import animeon_parser
-from stream2mediaserver.utils.test_data_logger import TestDataLogger
+from stream2mediaserver.main_logic import MainLogic  # noqa: E402
+from stream2mediaserver.parser import animeon_parser  # noqa: E402
+from stream2mediaserver.utils.test_data_logger import TestDataLogger  # noqa: E402
 
 
 def run_search(query: str) -> None:
@@ -71,9 +71,7 @@ def _print_search_results(provider_label: str, results: List[Any]) -> None:
             print(f"     {link}")
 
 
-def _print_series_details(
-    provider_label: str, url: str, groups: List[Any]
-) -> None:
+def _print_series_details(provider_label: str, url: str, groups: List[Any]) -> None:
     """Print details/series block for one provider (first title). groups = List[SeriesGroup] from load_details_page."""
     total = sum(len(getattr(g, "episodes", [])) for g in groups)
     print(f"  Details (first title): {url}")
@@ -113,7 +111,9 @@ async def run_populate_test_data_async(query: str, dump_dir: Path) -> None:
 
     # Build (provider_label -> results) and (provider_name -> first_url) for details
     search_by_label: dict = {}
-    details_tasks: List[Tuple[str, str, str]] = []  # (provider_name, provider_label, url)
+    details_tasks: List[
+        Tuple[str, str, str]
+    ] = []  # (provider_name, provider_label, url)
     for name, outcome in zip(provider_names, search_outcomes):
         if isinstance(outcome, Exception):
             print(f"\n[{name}] Error: {outcome}")

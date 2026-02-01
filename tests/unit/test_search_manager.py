@@ -48,9 +48,7 @@ class SearchManagerUnitTests(unittest.TestCase):
         )
         mock_get.return_value = FakeResponse(json_data={"response": html_payload})
 
-        groups = SearchManager.get_series_page(
-            "uakino", "https://uakino.me/series"
-        )
+        groups = SearchManager.get_series_page("uakino", "https://uakino.me/series")
 
         self.assertEqual(len(groups), 1)
         self.assertEqual(groups[0].studio_id, "1")

@@ -253,7 +253,9 @@ class SearchManager:
                     if item.get("poster"):
                         poster = f"{base}/api/uploads/images/{item['poster']}"
                     elif item.get("image") and item["image"].get("original"):
-                        poster = f"{base}/api/uploads/images/{item['image']['original']}"
+                        poster = (
+                            f"{base}/api/uploads/images/{item['image']['original']}"
+                        )
                     elif item.get("image") and item["image"].get("preview"):
                         poster = f"{base}/api/uploads/images/{item['image']['preview']}"
                     results.append(
@@ -382,14 +384,16 @@ class SearchManager:
             sers_wr = soup.find("div", class_="frels2")
         if not sers_wr:
             return series_list
-        for idx, item in enumerate(
-            sers_wr.find_all("div", class_="video-item")
-        ):
+        for idx, item in enumerate(sers_wr.find_all("div", class_="video-item")):
             link = item.find("a", class_=lambda c: c and "vi-img" in c)
             if not link or not link.get("href"):
                 continue
             href = unquote(link.get("href", "").strip())
-            if not href or "season" not in href.lower() or "episode" not in href.lower():
+            if (
+                not href
+                or "season" not in href.lower()
+                or "episode" not in href.lower()
+            ):
                 continue
             episode_url = href if href.startswith("http") else urljoin(base_url, href)
             vi_title = item.find("div", class_="vi-title")
@@ -428,7 +432,9 @@ class SearchManager:
         return series_list
 
     @staticmethod
-    def get_news_id_from_uaflix_slug_page(url: str, headers: Optional[dict] = None) -> Optional[str]:
+    def get_news_id_from_uaflix_slug_page(
+        url: str, headers: Optional[dict] = None
+    ) -> Optional[str]:
         """Fetch a UAFlix slug URL (e.g. /serials/rik-i-morti-anime/) and extract news_id.
 
         DLE pages often embed news_id in scripts or links (playlists.php?news_id=...).

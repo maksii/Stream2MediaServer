@@ -116,9 +116,7 @@ class AnimeonProvider(ProviderBase):
                             )
                         )
                 else:
-                    episodes_count = max(
-                        (p.get("episodesCount") or 0) for p in players
-                    )
+                    episodes_count = max((p.get("episodesCount") or 0) for p in players)
                     if episodes_count <= 0:
                         continue
                     for n in range(1, episodes_count + 1):

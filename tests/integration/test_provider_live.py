@@ -2,7 +2,6 @@ import unittest
 
 from stream2mediaserver.config import AppConfig
 from stream2mediaserver.processors.request_manager import RequestManager
-from stream2mediaserver.processors.search_manager import SearchManager
 from stream2mediaserver.providers.animeon_provider import AnimeonProvider
 from stream2mediaserver.providers.anitube_provider import AnitubeProvider
 from stream2mediaserver.providers.uaflix_provider import UaflixProvider
@@ -18,13 +17,9 @@ class ProviderLiveIntegrationTests(unittest.TestCase):
                 "Provider base URL not reachable; skipping live integration test."
             )
 
-        results = SearchManager.search_movies(
-            provider.provider,
-            query,
-            provider.base_url,
-            provider.search_url,
-            headers=provider.headers,
-        )
+        # Use provider.search_title() so session, cookies, and provider-specific
+        # headers (e.g. Uakino's dle_hash/Cookie) are applied correctly.
+        results = provider.search_title(query)
         if not results:
             self.skipTest(
                 "No results returned; provider may have changed or blocked the request."

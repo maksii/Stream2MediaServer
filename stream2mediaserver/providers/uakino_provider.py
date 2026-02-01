@@ -42,7 +42,9 @@ class UakinoProvider(ProviderBase):
             soup = BeautifulSoup(main_page.text, "html.parser")
             dle_hash = None
             for var_name in ("dle_login_hash", "dle_hash"):
-                script_text = soup.find("script", string=re.compile(re.escape(var_name)))
+                script_text = soup.find(
+                    "script", string=re.compile(re.escape(var_name))
+                )
                 if script_text and script_text.string:
                     match = re.search(
                         rf"var {re.escape(var_name)}\s*=\s*['\"](\w+)['\"]",

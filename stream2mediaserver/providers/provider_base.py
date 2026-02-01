@@ -6,7 +6,7 @@ from urllib.parse import urljoin
 
 from ..config import AppConfig
 from ..models.search_result import SearchResult
-from ..models.series import Series, SeriesGroup
+from ..models.series import SeriesGroup
 
 
 class ProviderBase(ABC):
