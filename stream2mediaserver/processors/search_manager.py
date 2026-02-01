@@ -104,7 +104,7 @@ class SearchManager:
                 )
             elif provider == "animeon":
                 results = SearchManager._search_animeon(
-                    encoded_query, search_url, headers
+                    encoded_query, search_url, headers, base_url
                 )
         except Exception as e:
             logger.error(f"Error searching {provider}: {str(e)}")
@@ -234,29 +234,31 @@ class SearchManager:
 
     @staticmethod
     def _search_animeon(
-        query: str, search_url: str, headers: Optional[dict]
+        query: str,
+        search_url: str,
+        headers: Optional[dict],
+        base_url: str,
     ) -> List[SearchResult]:
-        """Search implementation for Animeon provider."""
+        """Search: GET {search_url}?text={query}. Result link = {base_url}/api/anime/{id}."""
         url = f"{search_url}?text={query}"
         response = RequestManager.get(url, headers=headers)
         results = []
         if response and response.ok:
             try:
                 data = response.json()
+                base = base_url.rstrip("/")
                 for item in data.get("result", []):
-                    url = f"https://animeon.club/api/anime/{item['id']}"
+                    link = f"{base}/api/anime/{item['id']}"
                     poster = ""
                     if item.get("poster"):
-                        poster = (
-                            f"https://animeon.club/api/uploads/images/{item['poster']}"
-                        )
+                        poster = f"{base}/api/uploads/images/{item['poster']}"
                     elif item.get("image") and item["image"].get("original"):
-                        poster = f"https://animeon.club/api/uploads/images/{item['image']['original']}"
+                        poster = f"{base}/api/uploads/images/{item['image']['original']}"
                     elif item.get("image") and item["image"].get("preview"):
-                        poster = f"https://animeon.club/api/uploads/images/{item['image']['preview']}"
+                        poster = f"{base}/api/uploads/images/{item['image']['preview']}"
                     results.append(
                         SearchResult(
-                            link=url,
+                            link=link,
                             image_url=poster,
                             title=item.get("titleUa", ""),
                             title_eng=item.get("titleEn", ""),
