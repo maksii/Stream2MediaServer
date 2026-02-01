@@ -12,9 +12,9 @@ from .models.series import Series
 __version__ = "0.1.8"
 
 __all__ = [
-    'AppConfig',
-    'config',
-    'MainLogic',
-    'SearchResult',
-    'Series',
+    "AppConfig",
+    "config",
+    "MainLogic",
+    "SearchResult",
+    "Series",
 ]

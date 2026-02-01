@@ -30,8 +30,12 @@ def run_delta(database: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Debug helpers for Stream2MediaServer")
     parser.add_argument("action", choices=["search", "initiate_scrap", "delta"])
-    parser.add_argument("--query", default="Naruto", help="Search query for main_logic search")
-    parser.add_argument("--db", default="data/animeon.sqlite", help="SQLite database path")
+    parser.add_argument(
+        "--query", default="Naruto", help="Search query for main_logic search"
+    )
+    parser.add_argument(
+        "--db", default="data/animeon.sqlite", help="SQLite database path"
+    )
     args = parser.parse_args()
 
     if args.action == "search":

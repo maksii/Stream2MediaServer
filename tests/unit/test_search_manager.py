@@ -29,8 +29,12 @@ class SearchManagerUnitTests(unittest.TestCase):
         self.assertEqual(cleaned, "Hello World")
 
     def test_extract_id_from_url_supports_slug_and_html(self):
-        self.assertEqual(SearchManager.extract_id_from_url("https://site.com/1234-title"), "1234")
-        self.assertEqual(SearchManager.extract_id_from_url("https://site.com/987.html"), "987")
+        self.assertEqual(
+            SearchManager.extract_id_from_url("https://site.com/1234-title"), "1234"
+        )
+        self.assertEqual(
+            SearchManager.extract_id_from_url("https://site.com/987.html"), "987"
+        )
         self.assertIsNone(SearchManager.extract_id_from_url("https://site.com/no-id"))
 
     @patch("stream2mediaserver.processors.search_manager.Series", FakeSeries)
@@ -43,7 +47,9 @@ class SearchManagerUnitTests(unittest.TestCase):
         )
         mock_get.return_value = FakeResponse(json_data={"response": html_payload})
 
-        series_list = SearchManager.get_series_page("uakino", "https://uakino.me/series")
+        series_list = SearchManager.get_series_page(
+            "uakino", "https://uakino.me/series"
+        )
 
         self.assertEqual(len(series_list), 1)
         self.assertEqual(series_list[0].studio_id, "1")
@@ -60,7 +66,9 @@ class SearchManagerUnitTests(unittest.TestCase):
         )
         mock_get.return_value = FakeResponse(json_data={"response": html_payload})
 
-        series_list = SearchManager.get_series_page("anitube", "https://anitube.in.ua/series")
+        series_list = SearchManager.get_series_page(
+            "anitube", "https://anitube.in.ua/series"
+        )
 
         self.assertEqual(len(series_list), 1)
         self.assertEqual(series_list[0].studio_id, "base_1")

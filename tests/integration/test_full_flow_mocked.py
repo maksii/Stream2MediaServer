@@ -42,8 +42,13 @@ class FullFlowMockedIntegrationTests(unittest.IsolatedAsyncioTestCase):
         config = AppConfig(providers={"fake_provider": True})
         logic = MainLogic(config)
 
-        with patch.object(MainLogic, "get_provider_class", return_value=FakeProvider), \
-            patch("stream2mediaserver.processors.covertor_manager.ConvertorManager", FakeConvertor):
+        with (
+            patch.object(MainLogic, "get_provider_class", return_value=FakeProvider),
+            patch(
+                "stream2mediaserver.processors.covertor_manager.ConvertorManager",
+                FakeConvertor,
+            ),
+        ):
             results = await logic.search("Sample")
             self.assertEqual(len(results), 1)
             self.assertEqual(results[0].provider, "fake_provider")
