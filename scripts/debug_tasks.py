@@ -84,10 +84,13 @@ def _print_series_details(provider_label: str, url: str, groups: List[Any]) -> N
         print(f"  [{label}] ({len(episodes)} series)")
         for i, ep in enumerate(episodes, 1):
             series = getattr(ep, "series", "") or ""
-            s_url = getattr(ep, "url", "") or ""
+            urls = getattr(ep, "urls", None)
+            if not urls:
+                urls = [getattr(ep, "url", "") or ""]
             print(f"    {i}. {series!s}")
-            if s_url:
-                print(f"       {s_url}")
+            for u in urls:
+                if u:
+                    print(f"       {u}")
 
 
 async def run_populate_test_data_async(query: str, dump_dir: Path) -> None:

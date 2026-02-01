@@ -88,34 +88,39 @@ class AnimeonProvider(ProviderBase):
                 players = item.get("player") or []
                 if not players:
                     continue
-                first_player_id = players[0].get("id")
-                episodes_url = (
-                    f"{self.base_url}/api/player/{anime_id}/episodes"
-                    f"?take=100&skip=-1&playerId={first_player_id}&translationId={trans_id}"
-                )
-                ep_response = RequestManager.get(episodes_url, headers=self.headers)
-                if ep_response and ep_response.ok:
-                    ep_data = ep_response.json()
-                    for ep in ep_data.get("episodes") or []:
-                        ep_num = ep.get("episode")
-                        series_label = (
-                            f"Серія {ep_num}"
-                            if ep_num is not None
-                            else f"Episode {ep.get('id', '')}"
-                        )
-                        ep_url = ep.get("videoUrl") or ep.get("fileUrl") or ""
-                        if not ep_url:
-                            continue
-                        flat.append(
-                            Series(
-                                studio_id=str(trans_id),
-                                studio_name=trans_name,
-                                series=series_label,
-                                url=ep_url,
-                                provider=self.provider,
+                got_any_episodes = False
+                for player in players:
+                    player_id = player.get("id")
+                    if not player_id:
+                        continue
+                    episodes_url = (
+                        f"{self.base_url}/api/player/{anime_id}/episodes"
+                        f"?take=100&skip=-1&playerId={player_id}&translationId={trans_id}"
+                    )
+                    ep_response = RequestManager.get(episodes_url, headers=self.headers)
+                    if ep_response and ep_response.ok:
+                        ep_data = ep_response.json()
+                        for ep in ep_data.get("episodes") or []:
+                            ep_num = ep.get("episode")
+                            series_label = (
+                                f"Серія {ep_num}"
+                                if ep_num is not None
+                                else f"Episode {ep.get('id', '')}"
                             )
-                        )
-                else:
+                            ep_url = ep.get("videoUrl") or ep.get("fileUrl") or ""
+                            if not ep_url:
+                                continue
+                            got_any_episodes = True
+                            flat.append(
+                                Series(
+                                    studio_id=str(trans_id),
+                                    studio_name=trans_name,
+                                    series=series_label,
+                                    url=ep_url,
+                                    provider=self.provider,
+                                )
+                            )
+                if not got_any_episodes:
                     episodes_count = max((p.get("episodesCount") or 0) for p in players)
                     if episodes_count <= 0:
                         continue

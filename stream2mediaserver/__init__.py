@@ -9,7 +9,7 @@ from .main_logic import MainLogic
 from .models.search_result import SearchResult
 from .models.series import Series
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 __all__ = [
     "AppConfig",

@@ -153,12 +153,27 @@ class SearchManager:
                 name_eng = (
                     SearchManager.clean_text(name_eng.get_text()) if name_eng else ""
                 )
+                year = None
+                rating = None
+                extend_info = link.find("div", class_="search-extend-info")
+                if extend_info:
+                    spans = extend_info.find_all("span")
+                    if len(spans) >= 1:
+                        year = SearchManager.clean_text(spans[0].get_text()) or None
+                    if len(spans) >= 2:
+                        rating_text = SearchManager.clean_text(spans[1].get_text())
+                        if rating_text:
+                            match = re.search(r"[\d.]+", rating_text)
+                            if match:
+                                rating = match.group(0)
                 results.append(
                     SearchResult(
                         link=url,
-                        image_url=poster,
+                        image_url=poster or None,
                         title=name,
-                        title_eng=name_eng,
+                        title_eng=name_eng or None,
+                        year=year,
+                        rating=rating,
                         provider="uakino",
                     )
                 )
@@ -190,12 +205,31 @@ class SearchManager:
                 poster = unquote(link.img.get("src", "")) if link.img else ""
                 name = link.find("b", class_="searchheading_title")
                 name = SearchManager.clean_text(name.get_text()) if name else ""
+                year = link.get("year")
+                if year is not None:
+                    year = str(year).strip() or None
+                rating = link.get("rating")
+                if rating is not None:
+                    rating = str(rating).strip() or None
+                description = None
+                img_fast = link.find("div", class_="img_fast_search")
+                if img_fast:
+                    span = img_fast.find("span")
+                    if span:
+                        text = span.get_text()
+                        if "Опис:" in text:
+                            desc_part = text.split("Опис:", 1)[-1].strip()
+                            if desc_part:
+                                description = SearchManager.clean_text(desc_part)
                 results.append(
                     SearchResult(
                         link=url,
-                        image_url=poster,
+                        image_url=poster or None,
                         title=name,
-                        title_eng="Not Specified",
+                        title_eng=None,
+                        description=description,
+                        year=year,
+                        rating=rating,
                         provider="anitube",
                     )
                 )
@@ -212,21 +246,31 @@ class SearchManager:
             soup = BeautifulSoup(response.text, "html.parser")
             for link in soup.find_all("a", class_="sres-wrap clearfix"):
                 url = unquote(link.get("href", ""))
-                poster = unquote(link.find("img").get("src", ""))
-                if not poster.startswith("http"):
+                img_el = link.find("img")
+                poster = unquote(img_el.get("src", "")) if img_el else ""
+                if poster and not poster.startswith("http"):
                     poster = "https://uafix.net" + poster
-                name = link.find("h2").get_text().split("/")[0].strip()
+                h2 = link.find("h2")
+                h2_text = h2.get_text().strip() if h2 else ""
+                name = h2_text.split("/")[0].strip() if h2_text else ""
                 name_eng = (
-                    link.find("h2").get_text().split("/")[1].strip()
-                    if "/" in link.find("h2").get_text()
-                    else "Not Specified"
+                    h2_text.split("/")[1].strip()
+                    if "/" in h2_text
+                    else None
+                )
+                sres_desc = link.find("div", class_="sres-desc")
+                description = (
+                    SearchManager.clean_text(sres_desc.get_text())
+                    if sres_desc and sres_desc.get_text()
+                    else None
                 )
                 results.append(
                     SearchResult(
                         link=url,
-                        image_url=poster,
+                        image_url=poster or None,
                         title=name,
                         title_eng=name_eng,
+                        description=description,
                         provider="uaflix",
                     )
                 )
@@ -258,12 +302,26 @@ class SearchManager:
                         )
                     elif item.get("image") and item["image"].get("preview"):
                         poster = f"{base}/api/uploads/images/{item['image']['preview']}"
+                    # series_info: e.g. "12 серій, 23 хв"
+                    episodes = item.get("episodes")
+                    episode_time = item.get("episodeTime") or ""
+                    series_info = None
+                    if episodes is not None and episode_time:
+                        series_info = f"{episodes} серій, {episode_time}"
+                    elif episodes is not None:
+                        series_info = f"{episodes} серій"
+                    elif episode_time:
+                        series_info = episode_time
                     results.append(
                         SearchResult(
                             link=link,
                             image_url=poster,
                             title=item.get("titleUa", ""),
                             title_eng=item.get("titleEn", ""),
+                            description=item.get("description") or None,
+                            year=item.get("releaseDate") or None,
+                            rating=item.get("rating") or None,
+                            series_info=series_info,
                             provider="animeon",
                         )
                     )
