@@ -72,9 +72,9 @@ def _print_search_results(provider_label: str, results: List[Any]) -> None:
 
 
 def _print_series_details(provider_label: str, url: str, groups: List[Any]) -> None:
-    """Print details/series block for one provider (first title). groups = List[SeriesGroup] from load_details_page."""
+    """Print details/series block for one provider. groups = List[SeriesGroup] from load_details_page."""
     total = sum(len(getattr(g, "episodes", [])) for g in groups)
-    print(f"  Details (first title): {url}")
+    print(f"  Details: {url}")
     print(f"  Series: {total} item(s)")
     for group in groups:
         studio_name = getattr(group, "studio_name", "") or ""
@@ -112,23 +112,42 @@ async def run_populate_test_data_async(query: str, dump_dir: Path) -> None:
     ]
     search_outcomes = await asyncio.gather(*search_tasks, return_exceptions=True)
 
-    # Build (provider_label -> results) and (provider_name -> first_url) for details
+    # Build (provider_label -> results) and (provider_name -> urls) for details
     search_by_label: dict = {}
-    details_tasks: List[
-        Tuple[str, str, str]
-    ] = []  # (provider_name, provider_label, url)
+    details_tasks: List[Tuple[str, str, str]] = []  # (provider_name, provider_label, url)
     for name, outcome in zip(provider_names, search_outcomes):
         if isinstance(outcome, Exception):
             print(f"\n[{name}] Error: {outcome}")
             continue
         label, results = outcome
         search_by_label[label] = results
-        first_url: Optional[str] = None
+        urls_to_fetch: List[str] = []
         if results:
-            first = results[0]
-            first_url = getattr(first, "url", None) or getattr(first, "link", None)
-        if first_url:
-            details_tasks.append((name, label, first_url))
+            # UAFlix: fetch 2 details – one with /serials/, one without (if both present)
+            if name == "uaflix_provider":
+                with_serials = next(
+                    (r for r in results if "/serials/" in (getattr(r, "url", "") or getattr(r, "link", "") or "")),
+                    None,
+                )
+                without_serials = next(
+                    (r for r in results if "/serials/" not in (getattr(r, "url", "") or getattr(r, "link", "") or "")),
+                    None,
+                )
+                if with_serials:
+                    url = getattr(with_serials, "url", None) or getattr(with_serials, "link", None)
+                    if url:
+                        urls_to_fetch.append(url)
+                if without_serials:
+                    url = getattr(without_serials, "url", None) or getattr(without_serials, "link", None)
+                    if url and url not in urls_to_fetch:
+                        urls_to_fetch.append(url)
+            else:
+                first = results[0]
+                first_url = getattr(first, "url", None) or getattr(first, "link", None)
+                if first_url:
+                    urls_to_fetch.append(first_url)
+        for url in urls_to_fetch:
+            details_tasks.append((name, label, url))
 
     # Run all details fetches in parallel
     details_outcomes = await asyncio.gather(
@@ -139,14 +158,16 @@ async def run_populate_test_data_async(query: str, dump_dir: Path) -> None:
         return_exceptions=True,
     )
 
-    # Map provider_label -> (url, series_list)
+    # Map provider_label -> List[(url, series_list)]
     details_by_label: dict = {}
     for (name, label, url), outcome in zip(details_tasks, details_outcomes):
+        if label not in details_by_label:
+            details_by_label[label] = []
         if isinstance(outcome, Exception):
-            details_by_label[label] = (url, [])
+            details_by_label[label].append((url, []))
             continue
         _lab, _url, series_list = outcome
-        details_by_label[label] = (_url, series_list)
+        details_by_label[label].append((_url, series_list))
 
     # Print in stable order (by provider_names -> label)
     seen_labels = set()
@@ -162,8 +183,8 @@ async def run_populate_test_data_async(query: str, dump_dir: Path) -> None:
         results = search_by_label.get(label, [])
         _print_search_results(label, results)
         if label in details_by_label:
-            url, series_list = details_by_label[label]
-            _print_series_details(label, url, series_list)
+            for url, series_list in details_by_label[label]:
+                _print_series_details(label, url, series_list)
     print()
 
 

@@ -1,6 +1,6 @@
 """UAFlix provider implementation."""
 
-from ..models.series import group_series_by_studio
+from ..models.series import Series, SeriesGroup, group_series_by_studio
 from ..processors.covertor_manager import ConvertorManager
 from ..processors.m3u8_manager import M3U8Manager
 from ..processors.request_manager import RequestManager
@@ -50,7 +50,8 @@ class UaflixProvider(ProviderBase):
         try:
             # UAFlix series page (e.g. /serials/rik-i-morti-anime/) shows show details and
             # episode list under frels2 / #sers-wr; the player is only on each episode page.
-            # Fetch the series page HTML and parse episodes (url = episode page, not playlist).
+            # For non-series (e.g. movies), there is no episode list – the details page itself
+            # is the player page with the video embedded.
             response = RequestManager.get(query, headers=self.headers)
             if not response or not response.ok:
                 logger.error(f"Failed to get series page: {query}")
@@ -58,7 +59,17 @@ class UaflixProvider(ProviderBase):
             flat = SearchManager.parse_uaflix_series_page_html(
                 response, base_url=self.base_url
             )
-            return group_series_by_studio(flat)
+            if flat:
+                return group_series_by_studio(flat)
+            # No seasons/episodes: treat details page as the player page (single item)
+            single = Series(
+                studio_id="single",
+                studio_name="UAFlix",
+                series="Full",
+                url=query,
+                provider=self.provider,
+            )
+            return [SeriesGroup(studio_id="single", studio_name="UAFlix", episodes=[single])]
         except Exception as e:
             logger.error(f"Error loading details for {query}: {str(e)}")
             return []
