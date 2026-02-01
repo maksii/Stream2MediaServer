@@ -1,6 +1,8 @@
 """MP4 file processing manager."""
 
 from bs4 import BeautifulSoup
+
+from ..utils.logger import logger
 from .file_manager import FileManager
 from .request_manager import RequestManager
 
@@ -37,6 +39,8 @@ class MP4Manager:
     @staticmethod
     def download_series_content(series_url, destination, series_name):
         urls = MP4Manager.get_master_playlist(series_url)
+        if not urls:
+            raise Exception("No available streams found in the playlist")
         highest_quality_playlist = MP4Manager.identify_best_quality(urls)
 
         if highest_quality_playlist is None:
@@ -44,5 +48,5 @@ class MP4Manager:
 
         FileManager.download_file(highest_quality_playlist, destination, series_name)
 
-        print("Download completed.")
+        logger.info("Download completed.")
         return None

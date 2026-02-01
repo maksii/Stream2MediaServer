@@ -1,8 +1,4 @@
-"""Base provider module for stream2mediaserver.
-
-This module defines the abstract base class for all content providers.
-Each provider must implement the abstract methods defined here.
-"""
+"""Base provider module for stream2mediaserver."""
 
 from abc import ABC, abstractmethod
 from typing import List, Optional
@@ -11,7 +7,6 @@ from urllib.parse import urljoin
 from ..config import AppConfig
 from ..models.search_result import SearchResult
 from ..models.series import Series
-from ..utils.logger import logger
 
 
 class ProviderBase(ABC):
@@ -79,7 +74,7 @@ class ProviderBase(ABC):
         return urljoin(self.base_url, path.lstrip("/"))
 
     @abstractmethod
-    async def search_title(self, query: str) -> List[SearchResult]:
+    def search_title(self, query: str) -> List[SearchResult]:
         """Search for titles matching the query.
 
         Args:
@@ -94,7 +89,7 @@ class ProviderBase(ABC):
         raise NotImplementedError("Providers must implement search_title")
 
     @abstractmethod
-    async def load_details_page(self, url: str) -> Optional[Series]:
+    def load_details_page(self, url: str) -> Optional[Series]:
         """Load detailed information about a series.
 
         Args:
@@ -109,7 +104,7 @@ class ProviderBase(ABC):
         raise NotImplementedError("Providers must implement load_details_page")
 
     @abstractmethod
-    async def load_player_page(self, url: str) -> Optional[str]:
+    def load_player_page(self, url: str) -> Optional[str]:
         """Load the video player page and extract the video URL.
 
         Args:
@@ -122,33 +117,3 @@ class ProviderBase(ABC):
             NotImplementedError: If the provider hasn't implemented this method
         """
         raise NotImplementedError("Providers must implement load_player_page")
-
-    async def _make_request(
-        self, url: str, method: str = "GET", **kwargs
-    ) -> Optional[str]:
-        """Make an HTTP request with error handling.
-
-        Args:
-            url: The URL to request
-            method: HTTP method to use
-            **kwargs: Additional arguments to pass to requests
-
-        Returns:
-            Response text if successful, None otherwise
-        """
-        import aiohttp
-        import async_timeout
-
-        try:
-            timeout = self.config.provider_config.timeout
-            async with async_timeout.timeout(timeout):
-                async with aiohttp.ClientSession() as session:
-                    async with session.request(method, url, **kwargs) as response:
-                        if response.status == 200:
-                            return await response.text()
-                        else:
-                            logger.error(f"Request failed: {response.status} - {url}")
-                            return None
-        except Exception as e:
-            logger.error(f"Request error: {e} - {url}")
-            return None

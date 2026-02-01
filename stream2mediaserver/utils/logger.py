@@ -33,22 +33,21 @@ def setup_logger(
     level = level or config.log_config.level
     log_file = log_file or config.log_config.file
 
-    # Set log level
     logger.setLevel(getattr(logging, level.upper()))
 
-    # Create formatters and handlers
-    formatter = logging.Formatter(config.log_config.format)
+    if not logger.handlers:
+        formatter = logging.Formatter(config.log_config.format)
 
-    # Console handler
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
 
-    # File handler if specified
-    if log_file:
-        file_handler = logging.FileHandler(str(log_file))
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
+        if log_file:
+            file_handler = logging.FileHandler(str(log_file))
+            file_handler.setFormatter(formatter)
+            logger.addHandler(file_handler)
+
+        logger.propagate = False
 
     return logger
 

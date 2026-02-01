@@ -1,6 +1,10 @@
 """HTTP request management module."""
 
+from typing import Optional
+
 import requests
+
+from ..config import config
 from ..utils.logger import logger
 
 
@@ -11,9 +15,17 @@ class RequestManager:
     DEFAULT_HEADERS = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
+    DEFAULT_TIMEOUT = config.provider_config.timeout
+    _session = requests.Session()
 
     @classmethod
-    def get(cls, url: str, params=None, headers=None) -> requests.Response:
+    def _merge_headers(cls, headers: Optional[dict]) -> dict:
+        return {**cls.DEFAULT_HEADERS, **(headers or {})}
+
+    @classmethod
+    def get(
+        cls, url: str, params: Optional[dict] = None, headers: Optional[dict] = None
+    ) -> Optional[requests.Response]:
         """Perform a GET request.
 
         Args:
@@ -24,10 +36,14 @@ class RequestManager:
         Returns:
             Response object if successful, None otherwise
         """
-        if headers is None:
-            headers = cls.DEFAULT_HEADERS
+        merged_headers = cls._merge_headers(headers)
         try:
-            response = requests.get(url, headers=headers, params=params)
+            response = cls._session.get(
+                url,
+                headers=merged_headers,
+                params=params,
+                timeout=cls.DEFAULT_TIMEOUT,
+            )
             response.raise_for_status()
             return response
         except requests.RequestException as e:
@@ -35,7 +51,9 @@ class RequestManager:
             return None
 
     @classmethod
-    def post(cls, url: str, data=None, headers=None) -> requests.Response:
+    def post(
+        cls, url: str, data: Optional[dict] = None, headers: Optional[dict] = None
+    ) -> Optional[requests.Response]:
         """Perform a POST request.
 
         Args:
@@ -46,10 +64,14 @@ class RequestManager:
         Returns:
             Response object if successful, None otherwise
         """
-        if headers is None:
-            headers = cls.DEFAULT_HEADERS
+        merged_headers = cls._merge_headers(headers)
         try:
-            response = requests.post(url, headers=headers, data=data)
+            response = cls._session.post(
+                url,
+                headers=merged_headers,
+                data=data,
+                timeout=cls.DEFAULT_TIMEOUT,
+            )
             response.raise_for_status()
             return response
         except requests.RequestException as e:
