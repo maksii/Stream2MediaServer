@@ -2,6 +2,7 @@
 
 import html
 import re
+from difflib import SequenceMatcher
 from typing import List, Optional
 from urllib.parse import quote, unquote, urljoin, urlparse, urlunparse
 
@@ -13,8 +14,110 @@ from ..utils.logger import logger
 from .request_manager import RequestManager
 
 
+_EMBEDDED_URL = re.compile(r"https?://\S+")
+_BARE_HOST = re.compile(r"^[a-z0-9.-]+\.[a-z]{2,}(/|$)", re.I)
+
+_TOKEN_RE = re.compile(r"[^\W_]+", re.UNICODE)
+# Words too common to carry relevance in either language.
+_SEARCH_STOPWORDS = {
+    "the", "a", "an", "and", "or", "of", "on", "in", "at", "to", "for", "is",
+    "my", "no", "not", "season", "part",
+    "та", "і", "й", "у", "в", "на", "з", "до", "не", "сезон", "частина",
+}
+_MIN_TITLE_MATCH = 0.6  # 2-token queries must match both; 3-token, two of three
+_FUZZY_MIN_TOKEN_LEN = 5
+_FUZZY_MIN_RATIO = 0.85
+
+# Anitube playlist navigation labels that name something other than a studio.
+_ANITUBE_SUBTITLE_LABELS = {"субтитри"}
+_ANITUBE_DUB_TYPE_LABELS = {"озвучення", "озвучка", "субтитри"}
+_ANITUBE_PLAYER_LABEL = re.compile(r"^плеєр\b", re.I)
+_ANITUBE_RANGE_LABEL = re.compile(r"^[\d\s\-–—]+сер[іi]", re.I)
+
+
 class SearchManager:
     """Manages search operations across different content providers."""
+
+    @staticmethod
+    def _tokenize(text: Optional[str]) -> List[str]:
+        """Split text into lowercase word tokens (Unicode-aware)."""
+        return [t.lower() for t in _TOKEN_RE.findall(text or "")]
+
+    @staticmethod
+    def title_match_score(query: str, candidate_titles: List[Optional[str]]) -> float:
+        """Fraction of significant query tokens present in a result's titles.
+
+        Animeon's API ORs the query tokens, so a query containing a common word
+        ('the', 'and') matches nearly the whole catalogue and returns newest-first
+        filler. Neither the result count nor the ordering distinguishes that from a
+        genuine hit ('Attack on Titan' legitimately reports 1330 matches, while the
+        junk-only 'Stranger Things' reports 4), so relevance has to be judged per
+        item against the titles themselves.
+
+        Args:
+            query: The user's search query
+            candidate_titles: Titles/synonyms for one result
+
+        Returns:
+            0.0-1.0; 1.0 when the query carries no significant tokens to judge on
+        """
+        query_tokens = [
+            t
+            for t in SearchManager._tokenize(query)
+            if len(t) > 1 and t not in _SEARCH_STOPWORDS
+        ]
+        if not query_tokens:
+            return 1.0  # e.g. a query of only stopwords: nothing to judge, don't filter
+
+        candidate_tokens = set()
+        for title in candidate_titles:
+            candidate_tokens.update(SearchManager._tokenize(title))
+        if not candidate_tokens:
+            return 0.0
+
+        matched = 0
+        for token in query_tokens:
+            if token in candidate_tokens:
+                matched += 1
+                continue
+            # Fuzzy only for longer tokens; short ones collide too easily
+            # ('dan' vs 'data' scores 0.86 and would match Red Data Girl).
+            if len(token) >= _FUZZY_MIN_TOKEN_LEN and any(
+                SequenceMatcher(None, token, other).ratio() >= _FUZZY_MIN_RATIO
+                for other in candidate_tokens
+            ):
+                matched += 1
+        return matched / len(query_tokens)
+
+    @staticmethod
+    def normalize_media_url(raw: Optional[str]) -> Optional[str]:
+        """Normalize a player URL taken from provider markup.
+
+        Providers store these inconsistently: absolute, protocol-relative
+        (//host/x), scheme-less (host/x), and a small share are corrupted by the
+        site itself (e.g. 'hhttps://…', 'honline/embed/1https://…'). Returns None
+        for values no valid absolute URL can be recovered from, so callers can
+        skip the episode instead of emitting a broken link downstream.
+
+        Args:
+            raw: Raw URL value from the page
+
+        Returns:
+            Absolute URL string, or None if unusable
+        """
+        if not raw:
+            return None
+        raw = raw.strip()
+        if raw.startswith(("http://", "https://")):
+            return raw
+        if raw.startswith("//"):
+            return f"https:{raw}"
+        embedded = _EMBEDDED_URL.search(raw)
+        if embedded:
+            return embedded.group(0)
+        if _BARE_HOST.match(raw):
+            return f"https://{raw}"
+        return None
 
     @staticmethod
     def get_dle_login_hash(
@@ -32,12 +135,13 @@ class SearchManager:
         """
         response = RequestManager.get(url, headers=headers)
         if response and response.ok:
-            soup = BeautifulSoup(response.text, "html.parser")
-            script_text = soup.find("script", string=re.compile(r"var dle_login_hash"))
-            if script_text:
-                match = re.search(r"var dle_login_hash = '(\w+)';", script_text.string)
-                if match:
-                    return match.group(1)
+            # Tolerate either quote style and arbitrary spacing; providers differ,
+            # and a strict pattern silently disables search for the whole provider.
+            match = re.search(
+                r"var\s+dle_login_hash\s*=\s*['\"](\w+)['\"]", response.text
+            )
+            if match:
+                return match.group(1)
         logger.warning(f"Failed to get DLE login hash for {provider}")
         return None
 
@@ -212,6 +316,7 @@ class SearchManager:
                 if rating is not None:
                     rating = str(rating).strip() or None
                 description = None
+                series_info = None
                 img_fast = link.find("div", class_="img_fast_search")
                 if img_fast:
                     span = img_fast.find("span")
@@ -221,6 +326,12 @@ class SearchManager:
                             desc_part = text.split("Опис:", 1)[-1].strip()
                             if desc_part:
                                 description = SearchManager.clean_text(desc_part)
+                        # e.g. "Серій: 1169 з ХХ (24 хв.)"
+                        info_match = re.search(
+                            r"Серій:\s*(.+?)(?:\s*Рік:|\s*Опис:|$)", text, re.DOTALL
+                        )
+                        if info_match:
+                            series_info = SearchManager.clean_text(info_match.group(1))
                 results.append(
                     SearchResult(
                         link=url,
@@ -228,6 +339,7 @@ class SearchManager:
                         title=name,
                         title_eng=None,
                         description=description,
+                        series_info=series_info,
                         year=year,
                         rating=rating,
                         provider="anitube",
@@ -287,11 +399,25 @@ class SearchManager:
         url = f"{search_url}?text={query}"
         response = RequestManager.get(url, headers=headers)
         results = []
+        dropped = 0
+        raw_query = unquote(query)
         if response and response.ok:
             try:
                 data = response.json()
                 base = base_url.rstrip("/")
                 for item in data.get("result", []):
+                    # The API ORs query tokens, so a common word pulls in unrelated
+                    # newest-first filler; keep only results the titles support.
+                    synonyms = item.get("synonyms") or []
+                    if isinstance(synonyms, str):
+                        synonyms = [synonyms]
+                    score = SearchManager.title_match_score(
+                        raw_query,
+                        [item.get("titleUa"), item.get("titleEn"), *synonyms],
+                    )
+                    if score < _MIN_TITLE_MATCH:
+                        dropped += 1
+                        continue
                     link = f"{base}/api/anime/{item['id']}"
                     poster = ""
                     if item.get("poster"):
@@ -327,6 +453,10 @@ class SearchManager:
                     )
             except ValueError as e:
                 logger.error(f"Failed to parse JSON response from Animeon: {str(e)}")
+        if dropped:
+            logger.info(
+                f"Animeon: dropped {dropped} result(s) unrelated to {raw_query!r}"
+            )
         return results
 
     @staticmethod
@@ -366,36 +496,101 @@ class SearchManager:
         """Parse series information from UAKino response."""
         series_list = []
         soup = BeautifulSoup(response.json()["response"], "html.parser")
+        skipped = 0
         for ul in soup.find_all("ul"):
             for li in ul.find_all("li", attrs={"data-id": True, "data-file": True}):
+                url = SearchManager.normalize_media_url(li["data-file"])
+                if not url:
+                    skipped += 1
+                    continue
                 series_list.append(
                     Series(
                         studio_id=li["data-id"],
-                        studio_name=li["data-voice"],
-                        series=li.text.strip(),
-                        url=f"https:{li['data-file']}",
+                        studio_name=li.get("data-voice") or "Unknown",
+                        series=SearchManager.clean_text(li.get_text()),
+                        url=url,
                         provider=provider,
                     )
                 )
+        if skipped:
+            logger.warning(
+                f"UAKino: skipped {skipped} episode(s) with unusable player URLs"
+            )
         return series_list
+
+    @staticmethod
+    def _anitube_studio(episode_id: str, labels: dict) -> tuple:
+        """Resolve the dubbing studio for an Anitube episode list id.
+
+        Anitube nests playlists to a variable depth:
+            shallow: <studio> > <episodes>
+            deep:    <ОЗВУЧЕННЯ|СУБТИТРИ> > <studio> > <player> > <range> > <episodes>
+        Taking the immediate parent therefore yields the studio on shallow titles
+        but the player ('ПЛЕЄР ASHDI') on deep ones. Walk the id hierarchy instead
+        and pick the shallowest ancestor that names a studio rather than a
+        dub type, a player, or an episode range.
+
+        Args:
+            episode_id: data-id of the episode's list node
+            labels: data-id -> text for every non-episode (navigation) node
+
+        Returns:
+            (studio_id, studio_name)
+        """
+        parts = episode_id.split("_")
+        # Prefixes shortest-first: '0_0', '0_0_0', ... including the node itself.
+        prefixes = ["_".join(parts[:i]) for i in range(2, len(parts) + 1)]
+        is_subtitles = any(
+            labels.get(p, "").strip().lower() in _ANITUBE_SUBTITLE_LABELS
+            for p in prefixes
+        )
+        for prefix in prefixes:
+            label = labels.get(prefix, "").strip()
+            if not label:
+                continue
+            lowered = label.lower()
+            if lowered in _ANITUBE_DUB_TYPE_LABELS:
+                continue
+            if _ANITUBE_PLAYER_LABEL.match(label) or _ANITUBE_RANGE_LABEL.match(label):
+                continue
+            # Dub and subtitle versions of the same studio are different releases.
+            name = f"{label} (Субтитри)" if is_subtitles else label
+            return prefix, name
+        parent = "_".join(parts[:-1])
+        return parent, labels.get(parent, "").strip() or "Unknown"
 
     @staticmethod
     def _parse_anitube_series(response, provider: str = "anitube") -> List[Series]:
         """Parse series information from Anitube response."""
         series_list = []
         soup = BeautifulSoup(response.json()["response"], "html.parser")
+        all_nodes = soup.find_all("li", attrs={"data-id": True})
+        labels = {
+            li["data-id"]: SearchManager.clean_text(li.get_text())
+            for li in all_nodes
+            if "data-file" not in li.attrs
+        }
+        skipped = 0
         for item in soup.find_all("li", attrs={"data-file": True}):
-            studio_id = item["data-id"]
-            base_id = "_".join(studio_id.split("_")[:-1])
-            studio_name_li = soup.find("li", attrs={"data-id": base_id})
+            url = SearchManager.normalize_media_url(item["data-file"])
+            if not url:
+                skipped += 1
+                continue
+            studio_id, studio_name = SearchManager._anitube_studio(
+                item["data-id"], labels
+            )
             series_list.append(
                 Series(
                     studio_id=studio_id,
-                    studio_name=studio_name_li.text if studio_name_li else "Unknown",
-                    series=item.text.strip(),
-                    url=item["data-file"],
+                    studio_name=studio_name,
+                    series=SearchManager.clean_text(item.get_text()),
+                    url=url,
                     provider=provider,
                 )
+            )
+        if skipped:
+            logger.warning(
+                f"Anitube: skipped {skipped} episode(s) with unusable player URLs"
             )
         return series_list
 
@@ -462,15 +657,20 @@ class SearchManager:
             if vi_rate:
                 title_parts.append(SearchManager.clean_text(vi_rate.get_text()))
             title = " ".join(title_parts) if title_parts else f"Episode {idx + 1}"
-            # Group by season: "Сезон 3 Серія 1 Execution" -> studio "UAFlix Сезон 3", series "Серія 1 Execution"
-            season_match = re.match(
-                r"^\s*(?:Сезон|Season)\s+(\d+)\s+(.*)$",
+            # Group by season: "Сезон 3 Серія 1 Execution" -> studio "UAFlix Сезон 3", series "Серія 1 Execution".
+            # Unaired episodes carry a prefix ("Прем'єра. 20.07.2026 Сезон 9 Серія 9 ..."),
+            # so search anywhere rather than anchoring, or they land outside their season.
+            season_match = re.search(
+                r"(?:Сезон|Season)\s+(\d+)\s*(.*)$",
                 title,
                 re.IGNORECASE | re.DOTALL,
             )
             if season_match:
                 season_num = season_match.group(1)
-                episode_label = season_match.group(2).strip()
+                prefix = title[: season_match.start()].strip()
+                episode_label = " ".join(
+                    part for part in (prefix, season_match.group(2).strip()) if part
+                )
                 studio_id = f"season_{season_num}"
                 studio_name = f"UAFlix Сезон {season_num}"
                 series_label = episode_label if episode_label else title

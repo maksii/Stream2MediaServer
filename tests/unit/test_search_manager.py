@@ -71,7 +71,9 @@ class SearchManagerUnitTests(unittest.TestCase):
         )
 
         self.assertEqual(len(groups), 1)
-        self.assertEqual(groups[0].studio_id, "base_1")
+        # Grouped under the studio node, not the episode list node, so the same
+        # studio's players merge into one group (see test_parsing.py).
+        self.assertEqual(groups[0].studio_id, "base")
         self.assertEqual(groups[0].studio_name, "Studio Base")
         self.assertEqual(len(groups[0].episodes), 1)
         self.assertEqual(groups[0].episodes[0].series, "Episode 1")
