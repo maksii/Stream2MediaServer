@@ -5,7 +5,10 @@ import time
 from typing import Dict, Optional
 from urllib.parse import urlparse
 
-import requests
+# curl_cffi replicates a real Chrome TLS/JA3 fingerprint. Plain `requests` is
+# fingerprinted and served a Cloudflare "Just a moment..." challenge (403) by
+# uakino.best regardless of headers.
+from curl_cffi import requests
 
 from ..config import config
 from ..utils.logger import logger
@@ -35,8 +38,10 @@ class RequestManager:
         "Sec-Fetch-Site": "none",
         "Sec-Fetch-User": "?1",
     }
-    DEFAULT_TIMEOUT = config.provider_config.timeout
-    _session = requests.Session()
+    # Statuses worth another attempt: rate limits, and transient origin/CDN faults.
+    RETRY_STATUSES = frozenset({429, 500, 502, 503, 504, 520, 521, 522, 524})
+    MAX_RETRY_WAIT = 30.0
+    _session = requests.Session(impersonate="chrome")
     _last_request_by_host: Dict[str, float] = {}
     _host_lock = threading.Lock()
 
@@ -64,63 +69,86 @@ class RequestManager:
         return {**cls.DEFAULT_HEADERS, **(headers or {})}
 
     @classmethod
-    def get(
-        cls, url: str, params: Optional[dict] = None, headers: Optional[dict] = None
-    ) -> Optional[requests.Response]:
-        """Perform a GET request.
+    def _retry_wait(cls, response, attempt: int) -> float:
+        """Seconds to wait before retrying: server's Retry-After, else exponential backoff."""
+        retry_after = response.headers.get("Retry-After") if response is not None else None
+        if retry_after:
+            try:
+                # Retry-After is either delta-seconds or an HTTP-date; only the
+                # former is worth honouring precisely, dates fall back to backoff.
+                return min(float(retry_after), cls.MAX_RETRY_WAIT)
+            except ValueError:
+                pass
+        return min(2.0**attempt, cls.MAX_RETRY_WAIT)
+
+    @classmethod
+    def _request(
+        cls, method: str, url: str, headers: Optional[dict] = None, **kwargs
+    ) -> Optional["requests.Response"]:
+        """Perform an HTTP request, retrying rate limits and transient failures.
 
         Args:
+            method: HTTP verb
             url: Target URL
-            params: Optional query parameters
-            headers: Optional custom headers
+            headers: Optional custom headers, merged over the browser defaults
+            **kwargs: Passed through to the session (params, data)
 
         Returns:
             Response object if successful, None otherwise
         """
-        cls._throttle_host(url)
         merged_headers = cls._merge_headers(headers)
-        try:
-            response = cls._session.get(
-                url,
-                headers=merged_headers,
-                params=params,
-                timeout=cls.DEFAULT_TIMEOUT,
-            )
-            response.raise_for_status()
-            TestDataLogger.log_response(response)
-            return response
-        except requests.RequestException as e:
-            TestDataLogger.log_response(getattr(e, "response", None), error=str(e))
-            logger.error(f"GET request failed for {url}: {str(e)}")
-            return None
+        attempts = max(1, config.provider_config.max_retries)
+        for attempt in range(attempts):
+            cls._throttle_host(url)
+            last = attempt == attempts - 1
+            try:
+                response = cls._session.request(
+                    method,
+                    url,
+                    headers=merged_headers,
+                    timeout=config.provider_config.timeout,
+                    **kwargs,
+                )
+                if not response.ok:
+                    # Only rate limits and transient faults are worth a retry;
+                    # a 404 or 403 will not become a 200 on the next attempt.
+                    if response.status_code in cls.RETRY_STATUSES and not last:
+                        wait = cls._retry_wait(response, attempt)
+                        logger.warning(
+                            f"{method} {url} returned {response.status_code}, "
+                            f"retrying in {wait:.1f}s ({attempt + 1}/{attempts})"
+                        )
+                        time.sleep(wait)
+                        continue
+                    error = f"HTTP {response.status_code}"
+                    TestDataLogger.log_response(response, error=error)
+                    logger.error(f"{method} request failed for {url}: {error}")
+                    return None
+                TestDataLogger.log_response(response)
+                return response
+            except requests.exceptions.RequestException as e:
+                if not last:
+                    wait = cls._retry_wait(getattr(e, "response", None), attempt)
+                    logger.warning(
+                        f"{method} {url} failed ({e}), "
+                        f"retrying in {wait:.1f}s ({attempt + 1}/{attempts})"
+                    )
+                    time.sleep(wait)
+                    continue
+                TestDataLogger.log_response(getattr(e, "response", None), error=str(e))
+                logger.error(f"{method} request failed for {url}: {str(e)}")
+        return None
+
+    @classmethod
+    def get(
+        cls, url: str, params: Optional[dict] = None, headers: Optional[dict] = None
+    ) -> Optional["requests.Response"]:
+        """Perform a GET request. See _request."""
+        return cls._request("GET", url, headers=headers, params=params)
 
     @classmethod
     def post(
         cls, url: str, data: Optional[dict] = None, headers: Optional[dict] = None
-    ) -> Optional[requests.Response]:
-        """Perform a POST request.
-
-        Args:
-            url: Target URL
-            data: Optional POST data
-            headers: Optional custom headers
-
-        Returns:
-            Response object if successful, None otherwise
-        """
-        cls._throttle_host(url)
-        merged_headers = cls._merge_headers(headers)
-        try:
-            response = cls._session.post(
-                url,
-                headers=merged_headers,
-                data=data,
-                timeout=cls.DEFAULT_TIMEOUT,
-            )
-            response.raise_for_status()
-            TestDataLogger.log_response(response)
-            return response
-        except requests.RequestException as e:
-            TestDataLogger.log_response(getattr(e, "response", None), error=str(e))
-            logger.error(f"POST request failed for {url}: {str(e)}")
-            return None
+    ) -> Optional["requests.Response"]:
+        """Perform a POST request. See _request."""
+        return cls._request("POST", url, headers=headers, data=data)

@@ -1,7 +1,15 @@
-import random
-import requests
 import sqlite3
-import time
+
+from ..config import config
+from ..processors.request_manager import RequestManager
+
+# Bulk scraping makes tens of thousands of calls to animeon's own JSON API, which
+# tolerates fast pacing; the 2s/host provider throttle would take days.
+SCRAPE_DELAY_SECONDS = 0.3
+
+
+def _pace_for_scraping() -> None:
+    config.provider_config.request_delay_seconds = SCRAPE_DELAY_SECONDS
 
 
 def create_connection(db_file):
@@ -187,16 +195,9 @@ def setup_database(connection):
 
 
 def fetch_api(url):
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36"
-    }
-    max_retries = 3
-    for attempt in range(max_retries):
-        time.sleep(random.uniform(0.1, 0.3))  # Sleep randomly
-        response = requests.get(url, headers=headers)
-        if response.status_code == 200:
-            return response.json()
-    return None
+    """Fetch a JSON endpoint via the shared request layer (retries, 429 backoff, headers)."""
+    response = RequestManager.get(url)
+    return response.json() if response else None
 
 
 def safe_get(d, keys, default=None):
@@ -426,6 +427,7 @@ def get_last_index(conn):
 
 
 def initiate_scrap(conn):
+    _pace_for_scraping()
     last_index = get_last_index(conn)
     index = last_index + 1  # Start from the next index after the last processed one
     while True:
@@ -518,6 +520,7 @@ def check_new_animes(conn):
 
 
 def delta(conn):
+    _pace_for_scraping()
     check_new_animes(conn)
     process_new_anime_ids(conn)
     clear_processed_ids(conn)

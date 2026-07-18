@@ -1,7 +1,4 @@
 import time
-import requests
-import re
-from bs4 import BeautifulSoup
 from ..processors.covertor_manager import ConvertorManager
 from ..processors.m3u8_manager import M3U8Manager
 from ..processors.search_manager import SearchManager
@@ -28,44 +25,22 @@ class UakinoProvider(ProviderBase):
 
     def search_title(self, query):
         try:
-            # Initialize session for cookie persistence
-            session = requests.Session()
-            session.headers.update(self.headers)
-
-            # First, get the main page to establish session and cookies
-            main_page = session.get(self.base_url)
-            if not main_page.ok:
-                logger.error(f"Failed to access main page: {main_page.status_code}")
-                return []
-
-            # Extract DLE hash from the main page (ajax search expects dle_hash in form)
-            soup = BeautifulSoup(main_page.text, "html.parser")
-            dle_hash = None
-            for var_name in ("dle_login_hash", "dle_hash"):
-                script_text = soup.find(
-                    "script", string=re.compile(re.escape(var_name))
-                )
-                if script_text and script_text.string:
-                    match = re.search(
-                        rf"var {re.escape(var_name)}\s*=\s*['\"](\w+)['\"]",
-                        script_text.string,
-                    )
-                    if match:
-                        dle_hash = match.group(1)
-                        break
-
+            # Fetching the main page both yields the hash and seeds session cookies
+            # that the ajax search endpoint expects.
+            dle_hash = SearchManager.get_dle_login_hash(
+                self.provider, self.base_url, self.headers
+            )
             if not dle_hash:
                 logger.warning(f"Failed to retrieve dle_login_hash for query: {query}")
                 return []
 
-            # Prepare search request with proper headers and cookies (match browser: referrer = search page)
+            # Match the browser's XHR: referrer = search page
             search_headers = self.headers.copy()
             search_headers.update(
                 {
                     "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
                     "X-Requested-With": "XMLHttpRequest",
                     "Referer": f"{self.base_url}/index.php?do=search",
-                    "Cookie": f"dle_hash={dle_hash}; {'; '.join(f'{k}={v}' for k, v in session.cookies.items())}",
                 }
             )
 

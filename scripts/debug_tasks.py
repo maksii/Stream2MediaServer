@@ -9,6 +9,9 @@ _root = Path(__file__).resolve().parent.parent
 if str(_root) not in sys.path:
     sys.path.insert(0, str(_root))
 
+# Provider titles are Cyrillic; Windows consoles default to cp1252 and raise on print.
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 from stream2mediaserver.main_logic import MainLogic  # noqa: E402
 from stream2mediaserver.parser import animeon_parser  # noqa: E402
 from stream2mediaserver.utils.test_data_logger import TestDataLogger  # noqa: E402
